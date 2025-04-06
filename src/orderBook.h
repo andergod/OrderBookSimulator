@@ -3,6 +3,7 @@
 #include <chrono>
 #include <string> 
 #include <map> 
+#include <vector>
 
 struct order
 {
@@ -12,7 +13,7 @@ struct order
     std::string side; 
 };
 
-std::map<double, order> initiate_order_book();
+std::map<double, std::vector<order>> initiate_order_book();
 
 class orderGenerator{
     private:

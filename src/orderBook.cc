@@ -13,8 +13,8 @@
  *
  */
 
-std::map<double, order> initiate_order_book() {
-    return std::map<double, order>{};
+std::map<double, std::vector<order>> initiate_order_book() {
+    return std::map<double, std::vector<order>>{};
 }
 
 double generateRandomPrice(double min, double max) {
