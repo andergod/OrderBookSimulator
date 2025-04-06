@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <iostream>
 #include <map>
-#include "my_lib.h"
+#include "orderBook.h"
 #include <random>
 #include <cmath>
 #include <vector>
@@ -12,11 +12,6 @@
  * @brief Prints out hello world and tests the JSON Lib.
  *
  */
-void print_hello_world()
-{
-    std::cout << "Hello World!\n";
-
-}
 
 std::map<double, order> initiate_order_book() {
     return std::map<double, order>{};

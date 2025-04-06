@@ -4,8 +4,6 @@
 #include <string> 
 #include <map> 
 
-void print_hello_world();
-
 struct order
 {
     std::string order_id;
