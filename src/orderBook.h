@@ -13,6 +13,14 @@ struct order
     std::string side; 
 };
 
+class orderBook{
+    private:
+        std::map<double, std::vector<order>> order_book;
+    public:
+        void addOrder(const order &received);
+        void showBook();
+}; 
+
 std::map<double, std::vector<order>> initiate_order_book();
 
 class orderGenerator{

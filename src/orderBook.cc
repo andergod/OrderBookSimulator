@@ -1,5 +1,3 @@
-#pragma once
-
 #include <cstdint>
 #include <iostream>
 #include <map>
@@ -13,6 +11,27 @@
  *
  */
 
+void orderBook::addOrder(const order &received) {
+    order_book[received.price].push_back(received);
+};
+
+void orderBook::showBook() {
+    for (auto& pair : order_book) {
+        const double &price = pair.first; // The price is the key
+        const std::vector<order>& ordersAtPrice = pair.second; // The vector of orders at this price
+
+        // Print the price level
+        std::cout << "Price: " << price << std::endl;
+
+        // Iterating over the orders at this price
+        for (const auto& o : ordersAtPrice) {
+            std::cout << "  Order ID: " << o.order_id
+                    << ", Quantity: " << o.quantity
+                    << ", Side: " << o.side << std::endl;
+        }
+    }   
+}
+ 
 std::map<double, std::vector<order>> initiate_order_book() {
     return std::map<double, std::vector<order>>{};
 }
