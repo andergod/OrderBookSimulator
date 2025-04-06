@@ -4,6 +4,9 @@
 #include <string> 
 #include <map> 
 #include <vector>
+#include <array>
+#include <deque>
+#include <unordered_map>
 
 struct order
 {
@@ -11,17 +14,35 @@ struct order
     double price;
     int quantity;
     std::string side; 
+    std::chrono::system_clock::time_point timestamp;
+};
+
+struct trade
+{
+    std::string trade_id;
+    double price;
+    int quantity;
+    std::chrono::system_clock::time_point timestamp;
+    trade(const std::string& id,const double& p,const int& q, const std::chrono::system_clock::time_point& t)
+    : trade_id(id), price(p), quantity(q), timestamp(t) {}
+};
+
+struct tradeRecord
+{
+    order order1;
+    order order2;
+    trade tradeDone;
 };
 
 class orderBook{
     private:
-        std::map<double, std::vector<order>> order_book;
+        void addToBook (order &received);
+        std::map<double, std::unordered_map<std::string, std::deque<order>>> order_book;
     public:
-        void addOrder(const order &received);
+        void addLimitOrder(order &received);
         void showBook();
+        std::vector<tradeRecord> trades;
 }; 
-
-std::map<double, std::vector<order>> initiate_order_book();
 
 class orderGenerator{
     private:

@@ -16,7 +16,7 @@ int main()
 
     while (true) {
         order new_order =  generator.generateOrder();
-        Book.addOrder(new_order);
+        Book.addLimitOrder(new_order);
 
         // Break after 5 secs of compiling
         std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
