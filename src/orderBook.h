@@ -29,6 +29,7 @@ struct trade
 
 struct tradeRecord
 {
+    // tradeRecord has two orders (buy and sell, and the actual transactions (trade struct))
     order order1;
     order order2;
     trade tradeDone;
@@ -37,18 +38,24 @@ struct tradeRecord
 class orderBook{
     private:
         void addToBook (order &received);
+        // core of the class: maybe a bit over-engineered? 
         std::map<double, std::unordered_map<std::string, std::deque<order>>> order_book;
     public:
+        // method for adding a limit order into the order book and match it if necessary
         void addLimitOrder(order &received);
+        // show the contect of the book
         void showBook();
+        // vector that holds the trades
         std::vector<tradeRecord> trades;
 }; 
 
 class orderGenerator{
     private:
+        // keep count of the Ids for each order generated
         long idCounter;
     public:
+        // class definition
         orderGenerator();
-
+        // method to generate random orders
         order generateOrder();
 };
