@@ -2,136 +2,156 @@
 #include <iostream>
 #include <map>
 #include "orderBook.h"
+#include "config.hpp"
 #include <random>
 #include <cmath>
 #include <vector>
 #include <ctime>
 #include <iomanip>
 #include <unordered_map>
+#include <array>
 
 /**
  * @brief Prints out hello world and tests the JSON Lib.
  *
  */
 
- // method for pushing a price into the book in case we don't find any match for it
-void orderBook::addToBook(order& received) {
-    order_book[received.price][received.side].push_back(received);
+// Order book definition
+orderBook::orderBook() : idCounter(1) {}
+
+std::int32_t  orderBook::priceToIdx(const double price) {
+    return std::int32_t (price - MINPRICE)/TICKSIZE;
 }
 
-void orderBook::addLimitOrder(order &received) {
-    received.timestamp = std::chrono::system_clock::now();
-    auto price_it = order_book.find(received.price);
-    // we'll match it to an opposing order
-    std::string opposing_order = (received.side == "Buy") ? "Sell" : "Buy";
-
-    // If no price found in the order book
-    if (price_it == order_book.end()) {
-        // push it into the book
-        addToBook(received);
+// method for pushing a price into the book in case we don't find any match for it
+void orderBook::pushOrder(const order& cleanRec, const double priceIdx, const bool side) {
+    std::array<std::deque<order>, MAXTICKS> &desiredBook = (side) ? askBook : bidBook;
+    std::int32_t &bestPxIdx = (side) ? bestAskIdx : bestBidIdx;
+    // updating bestAsk/bestBid in case new order is better and not matching
+    if (side) {
+        bestPxIdx=(priceIdx < bestPxIdx) ? priceIdx : bestPxIdx;
     } else {
-        // If we find a price in the order book 
-        auto &side_map = price_it->second;
-        auto side_it = side_map.find(opposing_order);
-        // if we find a opposing side. If the receiveds is buy, the match should live on sell
-        if (side_it != side_map.end()) {
-            // in the opposide is empty, then there is nothing to match
-            if (side_it->second.empty()) {
-                addToBook(received);
-            } else {
-                // if the opposite side is not empty, then we can found a match for our current order
-                // taking the order at the front of the deque
-                order &match = side_it->second.front();
+        bestPxIdx=(priceIdx > bestPxIdx) ? priceIdx : bestPxIdx;
+    }
+    desiredBook[priceIdx].push_back(cleanRec);   
+}
 
-                // the quantity traded will be the minimum between the buy and sell order
-                int quantityTraded = std::min(match.quantity, received.quantity);
-    
-                // this is a way i keep count of the tradeId
-                static int tradeId = 1;
+void orderBook::updateNextWorstPxIdx(const bool side) {
+    std::int32_t bestPxIdx = (side) ? bestBidIdx : bestAskIdx;
+    std::array<std::deque<order>, MAXTICKS> &desiredBook = (side) ? bidBook : askBook;
+    std::int32_t newPxIdx = bestPxIdx;
+    while (desiredBook[newPxIdx].empty()) {
+        newPxIdx=(side) ? newPxIdx-1 : newPxIdx + 1;
+    }
+    bestPxIdx = newPxIdx;
+}
 
-                // defining trade from the buy and sell order
-                trade tradeDone(std::to_string(tradeId++), received.price, quantityTraded, received.timestamp);
-                
-                // pusing it into the vector trades
-                trades.push_back({received, match, tradeDone});
-    
-                // updating the quantities for trading for the received order and matcher order                
-                match.quantity -= quantityTraded;
-                received.quantity -= quantityTraded;
-    
-                // if the quantity matched == 0, means the matched orders was fulfilled and should be kick out the orderBook
-                if (match.quantity == 0) {
-                    side_it->second.pop_front();
-                }
-
-                // if there is any quantity remaining from the received order, we should add it into the order book
-                if (received.quantity > 0) {
-                    addToBook(received);
-                }          
+void orderBook::matchOrder(order& cleanRec,const std::int32_t priceIdx,const bool side, const std::int32_t bestPxIdx) {
+    std::int32_t pxCheck = bestPxIdx;
+    std::array<std::deque<order>, MAXTICKS> &desiredBook = (side) ? bidBook : askBook;
+    while (pxCheck >= priceIdx) {
+        while (!desiredBook[pxCheck].empty()) {
+            order &matchingOrder = desiredBook[pxCheck][0];
+            std::int32_t trades = std::min(cleanRec.quantity, matchingOrder.quantity);
+            matchingOrder.quantity-=trades;
+            cleanRec.quantity-=trades;
+            if (matchingOrder.quantity == 0) {
+                desiredBook[pxCheck].pop_front();
             }
-        } else {
-            addToBook(received);    
+                
+            if (desiredBook[pxCheck].empty()) {
+                updateNextWorstPxIdx(!side);
+            }         
+
+            if (cleanRec.quantity == 0)
+                {return;}
         }
+        pxCheck=(side) ? pxCheck-1 : pxCheck + 1;
+    }
+    updateNextWorstPxIdx(!side);
+    if (cleanRec.quantity > 0) {
+        {pushOrder(cleanRec, priceIdx, side);}
     }
 }
 
-void orderBook::showBook() {
-    // method for showing the content of the order book
+void orderBook::addLimitOrder(orderReceived &received) {
+
+    order cleanRec(this->idCounter++, received.quantity, std::chrono::system_clock::now());
     
+    std::int32_t priceIdx = (received.price - MINPRICE)/TICKSIZE;
+    std::int32_t bestPxIdx = (received.side) ? bestBidIdx : bestAskIdx;
+    if (received.side) {
+        // if sells
+        (priceIdx <= bestPxIdx) ? matchOrder(cleanRec, priceIdx, received.side, bestPxIdx) : pushOrder(cleanRec, priceIdx, received.side);
+    } else {
+        // if buys
+        (priceIdx >= bestPxIdx) ? matchOrder(cleanRec, priceIdx, received.side, bestPxIdx) : pushOrder(cleanRec, priceIdx, received.side);
+    }
+
+}
+
+void orderBook::showBook() {
     // iterate over each price of the order book
-    for (auto& pair : order_book) {
-        const double &price = pair.first; // The price is the key
-        const std::unordered_map<std::string, std::deque<order>>& ordersAtPrice = pair.second; // The vector of orders at this price
+    using BookLevel = std::array<std::deque<order>, MAXTICKS>;
+    // Because i am making a array of references, I can't put them in a container
+    // So, when references aren't enough, I use pointers which difficult the verbosity but are more flexibles
+    std::array<BookLevel*, 2> orderBook = {&askBook, &bidBook};
+    std::array<std::string_view, 2> bookName = {"Ask Book: ", "Bid Book"};
+    for (std::int32_t j=0; j<orderBook.size(); ++j) {
+        std::cout << bookName[j] << std::endl;
+        BookLevel& book = *orderBook[j];
+        for (std::int32_t i=0; i<book.size(); ++i) {
+            double price = (i*TICKSIZE) + MINPRICE;
+            const std::deque<order>&ordersAtPrice= book[i]; // The vector of orders at this price
+            if (ordersAtPrice.empty()) {
+                continue;
+            }
+            // Print the price level
+            std::cout << "Price: " << price << std::endl;
 
-        // Print the price level
-        std::cout << "Price: " << price << std::endl;
-
-        // iterate over each side (buy and sell) in a determined price
-        for (const auto& map: ordersAtPrice) {
-            const std::string &side = map.first;
-            const std::deque<order> &orderAtSide = map.second;
-
-            std::cout << "Side: " << side << std::endl;
-
-            // Iterating over the orders at a determined side
-            for (const auto& o : orderAtSide) {
-                std::time_t time_now = std::chrono::system_clock::to_time_t(o.timestamp);
-                std::tm tm_now = *std::localtime(&time_now);
+            // iterate over each side (buy and sell) in a determined price
+            for (std::int32_t k=0; k<std::min<std::size_t>(2, ordersAtPrice.size()); ++k) {
+                const auto& o = ordersAtPrice[k];
+                std::time_t orderTime = std::chrono::system_clock::to_time_t(o.timestamp);
+                std::tm tm_order = *std::localtime(&orderTime);
 
                 // show the relevant values
                 std::cout << "  Order ID: " << o.order_id
                         << ", Quantity: " << o.quantity
-                        << ", Side: " << o.side
-                        << ", timestamp: " << std::put_time(&tm_now, "%Y-%m-%d %H:%M:%S")  << std::endl;
+                        << ", timestamp: " << std::put_time(&tm_order, "%Y-%m-%d %H:%M:%S")  << std::endl;
             }
-        }
-    }   
+            
+        }   
+    }
+    std::cout << "Best Ask: " << (bestAskIdx*TICKSIZE) + MINPRICE << std::endl;
+    std::cout << "Best Bid: " << (bestBidIdx*TICKSIZE) + MINPRICE << std::endl;
 }
  
 double generateRandomPrice(double min, double max) {
     // generate random price for orders
-    std::mt19937 rng(std::random_device{}());
+    // or thread local also heps
+    static std::mt19937 rng(std::random_device{}());
     std::uniform_real_distribution<double> dist(min, max);
     return std::round(dist(rng)*100)/100;
 }
 
-std::string generateSide() {
+bool generateSide() {
     // generate random side for orders
-    std::vector<std::string> sides = {"Buy", "Sell"};
+    std::vector<bool> sides = {0, 1};
     std::mt19937 rng(std::random_device{}());
     std::uniform_int_distribution<int> dist(0,sides.size() - 1);
     return sides[dist(rng)];
 }
 
 // define class order Generator
-orderGenerator::orderGenerator() : idCounter(1) {}
+orderGenerator::orderGenerator() : idGenerated(1) {}
 
-order orderGenerator::generateOrder(){
+orderReceived orderGenerator::generateOrder(){
     // we define an order from random variables (side and price)
-    order o;
-    o.order_id = std::to_string(idCounter++);
-    o.price = generateRandomPrice(150, 200);
-    o.quantity = static_cast<int>(generateRandomPrice(1,10));
+    orderReceived o;
+    // a price cannot be equal to maxPrice or it will overflow the index
+    o.price = generateRandomPrice(MINPRICE, MAXPRICE - 1);
+    o.quantity = static_cast<std::int32_t>(generateRandomPrice(1,10));
     o.side = generateSide();
     o.timestamp = std::chrono::system_clock::now();
     return o;

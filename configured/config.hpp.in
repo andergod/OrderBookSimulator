@@ -9,3 +9,9 @@ static constexpr std::string_view project_version = "@PROJECT_VERSION@";
 static constexpr std::int32_t project_version_major{@PROJECT_VERSION_MAJOR@};
 static constexpr std::int32_t project_version_minor{@PROJECT_VERSION_MINOR@};
 static constexpr std::int32_t project_version_patch{@PROJECT_VERSION_PATCH@};
+
+// Global variables for the scripts
+static constexpr double MINPRICE = 119.0;
+static constexpr double MAXPRICE = 125.0; //prices can't reach this maxPrice. All price < MAXPRICE
+static constexpr double TICKSIZE = 0.10;
+static constexpr std::int32_t MAXTICKS =static_cast<std::int32_t>((MAXPRICE - MINPRICE) / TICKSIZE);

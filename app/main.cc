@@ -1,6 +1,7 @@
 #include <iostream>
 #include "config.hpp"
 #include "orderBook.h"
+#include <cstdint>
 #include <map>
 #include <vector>
 
@@ -8,8 +9,7 @@ int main()
 {
     std::cout << project_name << '\n';
     std::cout << project_version << '\n';
-
-    // define the classes used
+  
     orderBook Book;
     orderGenerator generator;
 
@@ -18,7 +18,7 @@ int main()
 
     while (true) {
         // create an order to add to the book
-        order new_order =  generator.generateOrder();
+        orderReceived new_order =  generator.generateOrder();
         // add the order to the book and match it if there is a good match
         Book.addLimitOrder(new_order);
 
