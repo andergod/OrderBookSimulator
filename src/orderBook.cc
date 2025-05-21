@@ -24,7 +24,7 @@ std::int32_t  orderBook::priceToIdx(const double price) {
 }
 
 // method for pushing a price into the book in case we don't find any match for it
-void orderBook::pushOrder(const order& cleanRec, const double priceIdx, const bool side) {
+void orderBook::pushOrder(const order& cleanRec, const std::int32_t priceIdx, const bool side) {
     std::array<std::deque<order>, MAXTICKS> &desiredBook = (side) ? askBook : bidBook;
     std::int32_t &bestPxIdx = (side) ? bestAskIdx : bestBidIdx;
     // updating bestAsk/bestBid in case new order is better and not matching
@@ -36,41 +36,53 @@ void orderBook::pushOrder(const order& cleanRec, const double priceIdx, const bo
     desiredBook[priceIdx].push_back(cleanRec);   
 }
 
-void orderBook::updateNextWorstPxIdx(const bool side) {
-    std::int32_t bestPxIdx = (side) ? bestBidIdx : bestAskIdx;
-    std::array<std::deque<order>, MAXTICKS> &desiredBook = (side) ? bidBook : askBook;
-    std::int32_t newPxIdx = bestPxIdx;
-    while (desiredBook[newPxIdx].empty()) {
-        newPxIdx=(side) ? newPxIdx-1 : newPxIdx + 1;
+void orderBook::updateNextWorstPxIdx(bool side) {
+    std::int32_t* bestPxIdx = side ? &bestBidIdx : &bestAskIdx;
+    // here it suggest me to use auto, mmm i am doubtul about using it except for "for" statemetns
+    auto& book = side ? bidBook : askBook;
+    std::int32_t px = *bestPxIdx;
+    while (px >= 0 && px < MAXTICKS && book[px].empty()) {
+        px += (side ? -1 : 1);
     }
-    bestPxIdx = newPxIdx;
+    *bestPxIdx = px;
 }
 
-void orderBook::matchOrder(order& cleanRec,const std::int32_t priceIdx,const bool side, const std::int32_t bestPxIdx) {
-    std::int32_t pxCheck = bestPxIdx;
-    std::array<std::deque<order>, MAXTICKS> &desiredBook = (side) ? bidBook : askBook;
-    while (pxCheck >= priceIdx) {
-        while (!desiredBook[pxCheck].empty()) {
-            order &matchingOrder = desiredBook[pxCheck][0];
-            std::int32_t trades = std::min(cleanRec.quantity, matchingOrder.quantity);
-            matchingOrder.quantity-=trades;
-            cleanRec.quantity-=trades;
-            if (matchingOrder.quantity == 0) {
-                desiredBook[pxCheck].pop_front();
-            }
-                
-            if (desiredBook[pxCheck].empty()) {
-                updateNextWorstPxIdx(!side);
-            }         
+void orderBook::matchOrder(order &cleanRec, std::int32_t priceIdx, bool side, std::int32_t &bestPxIdx) {
+    std::array<std::deque<order>, MAXTICKS> &book = (side) ? bidBook : askBook;
 
-            if (cleanRec.quantity == 0)
-                {return;}
+    if (side) {
+        // sell order → match against bids (high to low)
+        for (int px = bestPxIdx; px >= priceIdx && cleanRec.quantity > 0; --px) {
+            matchAtPriceLevel(book[px], cleanRec);
+            if (book[px].empty() && px == bestPxIdx) {
+                updateNextWorstPxIdx(!side);
+            }
         }
-        pxCheck=(side) ? pxCheck-1 : pxCheck + 1;
+    } else {
+        // buy order → match against asks (low to high)
+        for (int px = bestPxIdx; px <= priceIdx && cleanRec.quantity > 0; ++px) {
+            matchAtPriceLevel(book[px], cleanRec);
+            if (book[px].empty() && px == bestPxIdx) {
+                updateNextWorstPxIdx(!side);
+            }
+        }
     }
-    updateNextWorstPxIdx(!side);
+    // push leftover if not fully filled
     if (cleanRec.quantity > 0) {
-        {pushOrder(cleanRec, priceIdx, side);}
+        pushOrder(cleanRec, priceIdx, side);
+    }
+}
+
+void orderBook::matchAtPriceLevel(std::deque<order> &level, order &cleanRec) {
+    while (!level.empty() && cleanRec.quantity > 0) {
+        order &matchingOrder = level.front();
+        std::int32_t trades = std::min(cleanRec.quantity, matchingOrder.quantity);
+        matchingOrder.quantity -= trades;
+        cleanRec.quantity -= trades;
+
+        if (matchingOrder.quantity == 0) {
+            level.pop_front();
+        }
     }
 }
 

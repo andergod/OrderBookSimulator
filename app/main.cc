@@ -15,7 +15,7 @@ int main()
 
     // timer initialized     
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-
+    // TODO: I am missing implmeneting cancellations and modification, but I have to job seek :C
     while (true) {
         // create an order to add to the book
         orderReceived new_order =  generator.generateOrder();

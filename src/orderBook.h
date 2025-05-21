@@ -48,9 +48,10 @@ struct tradeRecord
 
 class orderBook{
     private:
-        void pushOrder (const order &received, const double price, const bool side);
-        void matchOrder(order& cleanRec,const std::int32_t priceIdx,const bool side, const std::int32_t bestPxIdx);
+        void pushOrder (const order &received, const std::int32_t priceIdx, const bool side);
+        void matchOrder(order &cleanRec, std::int32_t priceIdx, bool side, std::int32_t &bestPxIdx);
         void updateNextWorstPxIdx(const bool side);
+        void matchAtPriceLevel(std::deque<order> &level, order &cleanRec);
         std::int32_t priceToIdx(const double price);
         std::array<std::deque<order>, MAXTICKS> bidBook;
         std::array<std::deque<order>, MAXTICKS> askBook;
