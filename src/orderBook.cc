@@ -25,6 +25,7 @@ std::int32_t  orderBook::priceToIdx(const double price) {
 
 // method for pushing a price into the book in case we don't find any match for it
 void orderBook::pushOrder(const order& cleanRec, const std::int32_t priceIdx, const bool side) {
+    // TODO: ADD to this function its addition to the lookupMap
     std::array<std::deque<order>, MAXTICKS> &desiredBook = (side) ? askBook : bidBook;
     std::int32_t &bestPxIdx = (side) ? bestAskIdx : bestBidIdx;
     // updating bestAsk/bestBid in case new order is better and not matching
@@ -81,6 +82,7 @@ void orderBook::matchAtPriceLevel(std::deque<order> &level, order &cleanRec) {
         cleanRec.quantity -= trades;
 
         if (matchingOrder.quantity == 0) {
+        // TODO check that if we pop the order, we delete it from the lookUpMap
             level.pop_front();
         }
     }

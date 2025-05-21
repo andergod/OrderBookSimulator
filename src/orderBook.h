@@ -38,6 +38,12 @@ struct trade
     : trade_id(id), price(p), quantity(q), timestamp(t) {}
 };
 
+struct OrderLocation {
+    bool is_bid;                   // Side
+    std::int32_t price_index;               // Price level index in your array
+    std::deque<order>::iterator order_it;  // Iterator pointing to the order inside the deque
+};
+
 struct tradeRecord
 {
     // tradeRecord has two orders (buy and sell, and the actual transactions (trade struct))
@@ -53,6 +59,7 @@ class orderBook{
         void updateNextWorstPxIdx(const bool side);
         void matchAtPriceLevel(std::deque<order> &level, order &cleanRec);
         std::int32_t priceToIdx(const double price);
+        std::unordered_map<std::string, OrderLocation> lookUpMap;
         std::array<std::deque<order>, MAXTICKS> bidBook;
         std::array<std::deque<order>, MAXTICKS> askBook;
         std::int32_t bestBidIdx = -1;
