@@ -34,14 +34,18 @@ struct trade
     double price;
     int quantity;
     std::chrono::system_clock::time_point timestamp;
-    trade(const std::string& id,const double& p,const int& q, const std::chrono::system_clock::time_point& t)
+    // is this always gonna be const? i am not making any change while defining
+    trade(const std::string id, const double p, const int q, const std::chrono::system_clock::time_point t)
     : trade_id(id), price(p), quantity(q), timestamp(t) {}
 };
 
 struct OrderLocation {
-    bool is_bid;                   // Side
-    std::int32_t price_index;               // Price level index in your array
-    std::deque<order>::iterator order_it;  // Iterator pointing to the order inside the deque
+    bool is_ask;                   // Side
+    std::int32_t price_index;      
+    std::deque<order>::iterator order_it; // Iterator pointing to the order inside the deque
+    OrderLocation() = default;  
+    OrderLocation(const bool side, std::int32_t pxIdx, std::deque<order>::iterator it)
+    : is_ask(side), price_index(pxIdx), order_it(it) {}
 };
 
 struct tradeRecord
@@ -59,7 +63,7 @@ class orderBook{
         void updateNextWorstPxIdx(const bool side);
         void matchAtPriceLevel(std::deque<order> &level, order &cleanRec);
         std::int32_t priceToIdx(const double price);
-        std::unordered_map<std::string, OrderLocation> lookUpMap;
+        std::unordered_map<std::int32_t, OrderLocation> lookUpMap;
         std::array<std::deque<order>, MAXTICKS> bidBook;
         std::array<std::deque<order>, MAXTICKS> askBook;
         std::int32_t bestBidIdx = -1;
@@ -72,6 +76,7 @@ class orderBook{
         void addLimitOrder(orderReceived &received);
         // show the contect of the book
         void showBook();
+        void showLookUpMap();
         // vector that holds the trades
         std::vector<tradeRecord> trades;
 }; 

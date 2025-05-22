@@ -25,7 +25,6 @@ std::int32_t  orderBook::priceToIdx(const double price) {
 
 // method for pushing a price into the book in case we don't find any match for it
 void orderBook::pushOrder(const order& cleanRec, const std::int32_t priceIdx, const bool side) {
-    // TODO: ADD to this function its addition to the lookupMap
     std::array<std::deque<order>, MAXTICKS> &desiredBook = (side) ? askBook : bidBook;
     std::int32_t &bestPxIdx = (side) ? bestAskIdx : bestBidIdx;
     // updating bestAsk/bestBid in case new order is better and not matching
@@ -35,6 +34,7 @@ void orderBook::pushOrder(const order& cleanRec, const std::int32_t priceIdx, co
         bestPxIdx=(priceIdx > bestPxIdx) ? priceIdx : bestPxIdx;
     }
     desiredBook[priceIdx].push_back(cleanRec);   
+    lookUpMap.emplace(cleanRec.order_id, OrderLocation(side, priceIdx, std::prev(desiredBook[priceIdx].end())));
 }
 
 void orderBook::updateNextWorstPxIdx(bool side) {
@@ -82,7 +82,7 @@ void orderBook::matchAtPriceLevel(std::deque<order> &level, order &cleanRec) {
         cleanRec.quantity -= trades;
 
         if (matchingOrder.quantity == 0) {
-        // TODO check that if we pop the order, we delete it from the lookUpMap
+            lookUpMap.erase(matchingOrder.order_id);
             level.pop_front();
         }
     }
@@ -139,6 +139,18 @@ void orderBook::showBook() {
     }
     std::cout << "Best Ask: " << (bestAskIdx*TICKSIZE) + MINPRICE << std::endl;
     std::cout << "Best Bid: " << (bestBidIdx*TICKSIZE) + MINPRICE << std::endl;
+}
+
+void orderBook::showLookUpMap () {
+    int count = 0;
+    for (const auto& entry : lookUpMap) {
+        std::cout << "Order ID: " << entry.first << std::endl;
+        std::cout << "Side (is_ask): " << entry.second.is_ask << std::endl;
+        std::cout << "Price Index: " << entry.second.price_index << std::endl;
+        std::cout << "--------------------------" << std::endl;
+
+        if (++count >= 10) break;  // stop after 10 entries
+    }
 }
  
 double generateRandomPrice(double min, double max) {

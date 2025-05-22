@@ -34,6 +34,7 @@ int main()
     
     // Show results
     Book.showBook();
+    Book.showLookUpMap();
 
     return 0;
 }
