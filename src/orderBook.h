@@ -8,6 +8,7 @@
 #include <deque>
 #include <unordered_map>
 #include "config.hpp"
+#include <optional>
 
 enum class Side:bool {
     Buy = false,
@@ -21,6 +22,7 @@ struct orderReceived
     std::int32_t quantity;
     Side side;  // 0 means buy, and 1 sell
     std::chrono::system_clock::time_point timestamp;
+    std::int32_t order_id;
 };
 
 // Making a mimic as what info do we actually stores for our L2 book
@@ -48,7 +50,6 @@ struct OrderLocation {
     Side side;                   
     std::int32_t price_index;      
     std::deque<order>::iterator order_it; // Iterator pointing to the order inside the deque
-    // OrderLocation() = default;  
     OrderLocation(const Side s, std::int32_t pxIdx, std::deque<order>::iterator it)
     : side(s), price_index(pxIdx), order_it(it) {}
 };
@@ -61,13 +62,26 @@ struct tradeRecord
     trade tradeDone;
 };
 
+enum class action:bool {
+    modify = true,
+    cancel = false
+};
+
+struct amendOrder {
+    const std::int32_t order_id;
+    const action act;
+    const std::optional<double> price;
+    amendOrder(const std::int32_t id, const action a, const std::optional<double> p = std::nullopt)
+    : order_id(id), act(a), price(p) {}
+};
+
 class orderBook{
     private:
-        void pushOrder (const order &received, const std::int32_t priceIdx, const Side side);
-        void matchOrder(order &cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
+        std::vector<int32_t> pushOrder (const order &received, const std::int32_t priceIdx, const Side side);
+        std::vector<int32_t> matchOrder(order &cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
         Side oppositeSide(const Side side);
         void updateNextWorstPxIdx(const Side side);
-        void matchAtPriceLevel(std::deque<order> &level, order &cleanRec);
+        std::vector<int32_t> matchAtPriceLevel(std::deque<order> &level, order &cleanRec);
         std::int32_t priceToIdx(const double price);
         std::unordered_map<std::int32_t, OrderLocation> lookUpMap;
         std::array<std::deque<order>, MAXTICKS> bidBook;
@@ -79,7 +93,7 @@ class orderBook{
         //orderBook definition    
         orderBook();
         // method for adding a limit order into the order book and match it if necessary
-        void addLimitOrder(orderReceived &received);
+        std::vector<int32_t> addLimitOrder(orderReceived &received);
         // show the contect of the book
         void showBook();
         void showLookUpMap();
@@ -91,9 +105,14 @@ class orderGenerator{
     private:
         // keep count of the Ids for each order generated
         std::int32_t idGenerated;
+        std::vector<std::int32_t> activeIds;
+        std::unordered_map<std::int32_t, std::size_t> idToIdx;
     public:
         // class definition
         orderGenerator();
+        amendOrder cancelOrders();
+        amendOrder modifyOrders();
+        void ackCancel(std::int32_t orderId);
         // method to generate random orders
         orderReceived generateOrder();
 };
