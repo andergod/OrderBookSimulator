@@ -9,12 +9,17 @@
 #include <unordered_map>
 #include "config.hpp"
 
+enum class Side:bool {
+    Buy = false,
+    Sell = true
+};
+
 // represent the order we receive raw
 struct orderReceived
 {
     double price;
     std::int32_t quantity;
-    bool side;  // 0 means buy, and 1 sell
+    Side side;  // 0 means buy, and 1 sell
     std::chrono::system_clock::time_point timestamp;
 };
 
@@ -27,7 +32,7 @@ struct order
     order(const std::int32_t id, const std::int32_t q, const std::chrono::system_clock::time_point t)
     : order_id(id), quantity(q), timestamp(t) {}
 };
-
+// Not using yet
 struct trade
 {
     std::string trade_id;
@@ -40,12 +45,12 @@ struct trade
 };
 
 struct OrderLocation {
-    bool is_ask;                   // Side
+    Side side;                   
     std::int32_t price_index;      
     std::deque<order>::iterator order_it; // Iterator pointing to the order inside the deque
-    OrderLocation() = default;  
-    OrderLocation(const bool side, std::int32_t pxIdx, std::deque<order>::iterator it)
-    : is_ask(side), price_index(pxIdx), order_it(it) {}
+    // OrderLocation() = default;  
+    OrderLocation(const Side s, std::int32_t pxIdx, std::deque<order>::iterator it)
+    : side(s), price_index(pxIdx), order_it(it) {}
 };
 
 struct tradeRecord
@@ -58,9 +63,10 @@ struct tradeRecord
 
 class orderBook{
     private:
-        void pushOrder (const order &received, const std::int32_t priceIdx, const bool side);
-        void matchOrder(order &cleanRec, std::int32_t priceIdx, bool side, std::int32_t &bestPxIdx);
-        void updateNextWorstPxIdx(const bool side);
+        void pushOrder (const order &received, const std::int32_t priceIdx, const Side side);
+        void matchOrder(order &cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
+        Side oppositeSide(const Side side);
+        void updateNextWorstPxIdx(const Side side);
         void matchAtPriceLevel(std::deque<order> &level, order &cleanRec);
         std::int32_t priceToIdx(const double price);
         std::unordered_map<std::int32_t, OrderLocation> lookUpMap;

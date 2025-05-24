@@ -19,44 +19,29 @@
 // Order book definition
 orderBook::orderBook() : idCounter(1) {}
 
-std::int32_t  orderBook::priceToIdx(const double price) {
-    return std::int32_t (price - MINPRICE)/TICKSIZE;
-}
+void orderBook::addLimitOrder(orderReceived &received) {
 
-// method for pushing a price into the book in case we don't find any match for it
-void orderBook::pushOrder(const order& cleanRec, const std::int32_t priceIdx, const bool side) {
-    std::array<std::deque<order>, MAXTICKS> &desiredBook = (side) ? askBook : bidBook;
-    std::int32_t &bestPxIdx = (side) ? bestAskIdx : bestBidIdx;
-    // updating bestAsk/bestBid in case new order is better and not matching
-    if (side) {
-        bestPxIdx=(priceIdx < bestPxIdx) ? priceIdx : bestPxIdx;
+    order cleanRec(this->idCounter++, received.quantity, std::chrono::system_clock::now());
+    
+    std::int32_t priceIdx = priceToIdx(received.price);
+    std::int32_t bestPxIdx = (received.side == Side::Sell) ? bestBidIdx : bestAskIdx;
+    if (received.side == Side::Sell) {
+        (priceIdx <= bestPxIdx) ? matchOrder(cleanRec, priceIdx, received.side, bestPxIdx) : pushOrder(cleanRec, priceIdx, received.side);
     } else {
-        bestPxIdx=(priceIdx > bestPxIdx) ? priceIdx : bestPxIdx;
+        (priceIdx >= bestPxIdx) ? matchOrder(cleanRec, priceIdx, received.side, bestPxIdx) : pushOrder(cleanRec, priceIdx, received.side);
     }
-    desiredBook[priceIdx].push_back(cleanRec);   
-    lookUpMap.emplace(cleanRec.order_id, OrderLocation(side, priceIdx, std::prev(desiredBook[priceIdx].end())));
+
 }
 
-void orderBook::updateNextWorstPxIdx(bool side) {
-    std::int32_t* bestPxIdx = side ? &bestBidIdx : &bestAskIdx;
-    // here it suggest me to use auto, mmm i am doubtul about using it except for "for" statemetns
-    auto& book = side ? bidBook : askBook;
-    std::int32_t px = *bestPxIdx;
-    while (px >= 0 && px < MAXTICKS && book[px].empty()) {
-        px += (side ? -1 : 1);
-    }
-    *bestPxIdx = px;
-}
+void orderBook::matchOrder(order &cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx) {
+    std::array<std::deque<order>, MAXTICKS> &book = (side == Side::Sell) ? bidBook : askBook;
 
-void orderBook::matchOrder(order &cleanRec, std::int32_t priceIdx, bool side, std::int32_t &bestPxIdx) {
-    std::array<std::deque<order>, MAXTICKS> &book = (side) ? bidBook : askBook;
-
-    if (side) {
+    if (side == Side::Sell) {
         // sell order → match against bids (high to low)
         for (int px = bestPxIdx; px >= priceIdx && cleanRec.quantity > 0; --px) {
             matchAtPriceLevel(book[px], cleanRec);
             if (book[px].empty() && px == bestPxIdx) {
-                updateNextWorstPxIdx(!side);
+                updateNextWorstPxIdx(oppositeSide(side));
             }
         }
     } else {
@@ -64,7 +49,7 @@ void orderBook::matchOrder(order &cleanRec, std::int32_t priceIdx, bool side, st
         for (int px = bestPxIdx; px <= priceIdx && cleanRec.quantity > 0; ++px) {
             matchAtPriceLevel(book[px], cleanRec);
             if (book[px].empty() && px == bestPxIdx) {
-                updateNextWorstPxIdx(!side);
+                updateNextWorstPxIdx(oppositeSide(side));
             }
         }
     }
@@ -72,6 +57,39 @@ void orderBook::matchOrder(order &cleanRec, std::int32_t priceIdx, bool side, st
     if (cleanRec.quantity > 0) {
         pushOrder(cleanRec, priceIdx, side);
     }
+}
+
+// method for pushing a price into the book in case we don't find any match for it
+void orderBook::pushOrder(const order& cleanRec, const std::int32_t priceIdx, const Side side) {
+    std::array<std::deque<order>, MAXTICKS> &desiredBook = (side == Side::Sell) ? askBook : bidBook;
+    std::int32_t &bestPxIdx = (side == Side::Sell) ? bestAskIdx : bestBidIdx;
+    // updating bestAsk/bestBid in case new order is better and not matching
+    if (side == Side::Sell) {
+        bestPxIdx=(priceIdx < bestPxIdx) ? priceIdx : bestPxIdx;
+    } else {
+        bestPxIdx=(priceIdx > bestPxIdx) ? priceIdx : bestPxIdx;
+    }
+    desiredBook[priceIdx].push_back(cleanRec);  
+    lookUpMap.emplace(cleanRec.order_id, OrderLocation(side, priceIdx, std::prev(desiredBook[priceIdx].end())));
+}
+
+void orderBook::updateNextWorstPxIdx(const Side side) {
+    std::int32_t &bestPxIdx = (side == Side::Sell) ? bestBidIdx : bestAskIdx;
+    // here it suggest me to use auto, mmm i am doubtul about using it except for "for" statemetns
+    auto& book = (side==Side::Sell) ? bidBook : askBook;
+    std::int32_t px = bestPxIdx;
+    while (px >= 0 && px < MAXTICKS && book[px].empty()) {
+        px += (side==Side::Sell ? -1 : 1);
+    }
+    bestPxIdx = px;
+}
+
+std::int32_t  orderBook::priceToIdx(const double price) {
+    return std::int32_t (price - MINPRICE)/TICKSIZE;
+}
+
+Side orderBook::oppositeSide(const Side side) {
+    return static_cast<Side>(!static_cast<bool>(side));
 }
 
 void orderBook::matchAtPriceLevel(std::deque<order> &level, order &cleanRec) {
@@ -88,21 +106,6 @@ void orderBook::matchAtPriceLevel(std::deque<order> &level, order &cleanRec) {
     }
 }
 
-void orderBook::addLimitOrder(orderReceived &received) {
-
-    order cleanRec(this->idCounter++, received.quantity, std::chrono::system_clock::now());
-    
-    std::int32_t priceIdx = (received.price - MINPRICE)/TICKSIZE;
-    std::int32_t bestPxIdx = (received.side) ? bestBidIdx : bestAskIdx;
-    if (received.side) {
-        // if sells
-        (priceIdx <= bestPxIdx) ? matchOrder(cleanRec, priceIdx, received.side, bestPxIdx) : pushOrder(cleanRec, priceIdx, received.side);
-    } else {
-        // if buys
-        (priceIdx >= bestPxIdx) ? matchOrder(cleanRec, priceIdx, received.side, bestPxIdx) : pushOrder(cleanRec, priceIdx, received.side);
-    }
-
-}
 
 void orderBook::showBook() {
     // iterate over each price of the order book
@@ -145,7 +148,7 @@ void orderBook::showLookUpMap () {
     int count = 0;
     for (const auto& entry : lookUpMap) {
         std::cout << "Order ID: " << entry.first << std::endl;
-        std::cout << "Side (is_ask): " << entry.second.is_ask << std::endl;
+        std::cout << "Side: (Is Sell?) " << static_cast<bool>(entry.second.side) << std::endl;
         std::cout << "Price Index: " << entry.second.price_index << std::endl;
         std::cout << "--------------------------" << std::endl;
 
@@ -161,12 +164,11 @@ double generateRandomPrice(double min, double max) {
     return std::round(dist(rng)*100)/100;
 }
 
-bool generateSide() {
+Side generateSide() {
     // generate random side for orders
-    std::vector<bool> sides = {0, 1};
     std::mt19937 rng(std::random_device{}());
-    std::uniform_int_distribution<int> dist(0,sides.size() - 1);
-    return sides[dist(rng)];
+    std::bernoulli_distribution dist(0.5);
+    return static_cast<Side>(dist(rng));
 }
 
 // define class order Generator
