@@ -20,7 +20,10 @@ int main()
         // create an order to add to the book
         orderReceived new_order =  generator.generateOrder();
         // add the order to the book and match it if there is a good match
-        Book.addLimitOrder(new_order);
+        std::vector<std::int32_t> cancelOrders = Book.addLimitOrder(new_order);
+        for (auto&mem : cancelOrders) {
+            generator.ackCancel(mem);
+        }
 
         // keep track of the time passed
         std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
@@ -35,6 +38,7 @@ int main()
     // Show results
     Book.showBook();
     Book.showLookUpMap();
+    generator.showActiveId();
 
     return 0;
 }

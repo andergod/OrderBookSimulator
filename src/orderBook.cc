@@ -28,6 +28,19 @@ std::vector<int32_t> orderBook::addLimitOrder(orderReceived &received) {
     return (condition) ? matchOrder(cleanRec, priceIdx, received.side, bestPxIdx) : pushOrder(cleanRec, priceIdx, received.side);
 }
 
+void orderBook::recModOrders(amendOrder modOrder) {
+    // TODO: Implement the recModOrder in main and recCancel as well
+    OrderLocation &loc = lookUpMap[modOrder.order_id];
+    std::array<std::deque<order>, MAXTICKS> &book = (loc.side == Side::Sell) ? askBook : bidBook;
+    const order oldOrder = *loc.order_it;
+    orderReceived newOrder(modOrder.price.value(), oldOrder.quantity, loc.side, std::chrono::system_clock::now(), oldOrder.order_id);
+    // Erase the original order from the deque and delete for LookupMap. It will be re-added later on addLimitOrder
+    book[loc.price_index].erase(loc.order_it);
+    lookUpMap.erase(modOrder.order_id);
+    // Re-add as a new limit order
+    addLimitOrder(newOrder);
+}
+
 std::vector<int32_t> orderBook::matchOrder(order &cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx) {
     // active orders
     std::array<std::deque<order>, MAXTICKS> &book = (side == Side::Sell) ? bidBook : askBook;
@@ -102,7 +115,7 @@ std::vector<int32_t> orderBook::matchAtPriceLevel(std::deque<order> &level, orde
 }
 
 std::int32_t  orderBook::priceToIdx(const double price) {
-    return std::int32_t (price - MINPRICE)/TICKSIZE;
+    return static_cast<std::int32_t>((price - MINPRICE)/TICKSIZE);
 }
 
 Side orderBook::oppositeSide(const Side side) {
@@ -127,7 +140,6 @@ void orderBook::showBook() {
             }
             // Print the price level
             std::cout << "Price: " << price << std::endl;
-
             // iterate over each side (buy and sell) in a determined price
             for (std::int32_t k=0; k<std::min<std::size_t>(2, ordersAtPrice.size()); ++k) {
                 const auto& o = ordersAtPrice[k];
@@ -151,8 +163,7 @@ void orderBook::showLookUpMap () {
     for (const auto& entry : lookUpMap) {
         std::cout << "Order ID: " << entry.first << std::endl;
         std::cout << "Side: (Is Sell?) " << static_cast<bool>(entry.second.side) << std::endl;
-        // TODO: This price is wrong, its on index space
-        std::cout << "Price Index: " << entry.second.price_index << std::endl;
+        std::cout << "Price Index: " << (entry.second.price_index * TICKSIZE) + MINPRICE << std::endl;
         std::cout << "--------------------------" << std::endl;
 
         if (++count >= 10) break;  // stop after 10 entries
@@ -174,14 +185,20 @@ Side generateSide() {
     return static_cast<Side>(dist(rng));
 }
 
-amendOrder orderGenerator::cancelOrders() {
-    std::int32_t randomId = activeIds[generateRandomPrice(0, static_cast<double>(activeIds.size()))];
-    auto idx = idToIdx[randomId];
+void orderGenerator::ackCancel(std::int32_t orderId) {
+    auto idx = idToIdx[orderId];
     // Algorithm so you can change the elements efficiently and deletes from record
     std::swap(activeIds[idx], activeIds.back());
     idToIdx[activeIds[idx]] = idx;   // update index of swapped element
     activeIds.pop_back();
-    idToIdx.erase(randomId);
+    idToIdx.erase(orderId);
+}
+
+amendOrder orderGenerator::cancelOrders() {
+    std::int32_t randomId = activeIds[generateRandomPrice(0, static_cast<double>(activeIds.size()))];
+    auto idx = idToIdx[randomId];
+    // Algorithm so you can change the elements efficiently and deletes from record
+    ackCancel(randomId);
     return amendOrder(randomId, action::cancel);
 }
 
@@ -194,18 +211,23 @@ amendOrder orderGenerator::modifyOrders() {
 orderGenerator::orderGenerator() : idGenerated(1) {}
 
 orderReceived orderGenerator::generateOrder(){
-    // TODO: THERE IS SOMETHING WRONG IN THE GENERATOR RADNOM PRICE, I GET ONLY INT PRICES
     // we define an order from random variables (side and price)
-    orderReceived o;
-    // a price cannot be equal to maxPrice or it will overflow the index
-    o.price = generateRandomPrice(MINPRICE, MAXPRICE - TICKSIZE);
-    o.quantity = static_cast<std::int32_t>(generateRandomPrice(1,10));
-    o.side = generateSide();
-    o.timestamp = std::chrono::system_clock::now();
-    o.order_id= idGenerated++;
+    orderReceived o(generateRandomPrice(MINPRICE, MAXPRICE - TICKSIZE), static_cast<std::int32_t>(generateRandomPrice(1,10)),
+        generateSide(), std::chrono::system_clock::now(), idGenerated++);
     // Add active ID to the activeIds and idToIdx
     activeIds.push_back(o.order_id);
     idToIdx[o.order_id] = activeIds.size() - 1;
     return o;
 }
 
+void orderGenerator::showActiveId() {
+    std::cout << "Active IDs: " << std::endl;
+    std::int32_t count= 0;
+    for (auto& mem: activeIds) {
+        std::cout << mem << std::endl;
+        ++count;
+        if (count>10) {
+            break;
+        }
+    }
+}

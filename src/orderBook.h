@@ -23,12 +23,14 @@ struct orderReceived
     Side side;  // 0 means buy, and 1 sell
     std::chrono::system_clock::time_point timestamp;
     std::int32_t order_id;
+    orderReceived(double p, std::int32_t q, Side s, std::chrono::system_clock::time_point  t, std::int32_t oId)
+    : price(p), quantity(q), side(s), timestamp(t), order_id(oId) {}
 };
 
 // Making a mimic as what info do we actually stores for our L2 book
 struct order
 {
-    const std::int32_t order_id;
+    std::int32_t order_id;
     std::int32_t quantity;
     std::chrono::system_clock::time_point timestamp;
     order(const std::int32_t id, const std::int32_t q, const std::chrono::system_clock::time_point t)
@@ -50,6 +52,7 @@ struct OrderLocation {
     Side side;                   
     std::int32_t price_index;      
     std::deque<order>::iterator order_it; // Iterator pointing to the order inside the deque
+    OrderLocation() = default;
     OrderLocation(const Side s, std::int32_t pxIdx, std::deque<order>::iterator it)
     : side(s), price_index(pxIdx), order_it(it) {}
 };
@@ -83,6 +86,7 @@ class orderBook{
         void updateNextWorstPxIdx(const Side side);
         std::vector<int32_t> matchAtPriceLevel(std::deque<order> &level, order &cleanRec);
         std::int32_t priceToIdx(const double price);
+        void recModOrders(amendOrder modOrder);
         std::unordered_map<std::int32_t, OrderLocation> lookUpMap;
         std::array<std::deque<order>, MAXTICKS> bidBook;
         std::array<std::deque<order>, MAXTICKS> askBook;
@@ -113,6 +117,7 @@ class orderGenerator{
         amendOrder cancelOrders();
         amendOrder modifyOrders();
         void ackCancel(std::int32_t orderId);
+        void showActiveId();
         // method to generate random orders
         orderReceived generateOrder();
 };
