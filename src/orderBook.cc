@@ -19,26 +19,93 @@
 // Order book definition
 orderBook::orderBook() : idCounter(1) {}
 
-std::vector<int32_t> orderBook::addLimitOrder(orderReceived &received) {
+std::vector<int32_t> orderBook::addLimitOrder(orderReceived received) {
     order cleanRec(received.order_id, received.quantity, std::chrono::system_clock::now());
     std::int32_t priceIdx = priceToIdx(received.price);
     std::int32_t bestPxIdx = (received.side == Side::Sell) ? bestBidIdx : bestAskIdx;
     // If sell then make it priceIdx <= bestPxIdex
     bool condition = (received.side == Side::Sell) ? (priceIdx <= bestPxIdx) : (priceIdx >= bestPxIdx);
+    if (DEBUGMODE) {
+        printf("Adding limit order for Id %d \n", cleanRec.order_id);
+        printf("Index Location: %d; ", priceIdx);
+        printf("Side: %d; ", received.side);
+        printf("Quantity: %d \n", cleanRec.quantity);
+        fflush(stdout);
+    }
     return (condition) ? matchOrder(cleanRec, priceIdx, received.side, bestPxIdx) : pushOrder(cleanRec, priceIdx, received.side);
 }
 
-void orderBook::recModOrders(amendOrder modOrder) {
-    // TODO: Implement the recModOrder in main and recCancel as well
-    OrderLocation &loc = lookUpMap[modOrder.order_id];
+std::vector<int32_t> orderBook::recModOrders(amendOrder modOrder) {
+    auto it = lookUpMap.find(modOrder.order_id);
+    if (it == lookUpMap.end()) {
+        printf("Order Not found, double check code");
+        return {};
+    } else {
+        OrderLocation &loc = it->second;
+        std::array<std::deque<order>, MAXTICKS> &book = (loc.side == Side::Sell) ? askBook : bidBook;
+        // I will bet this will break something, as I am adding it to a deque, where needs to be copied
+        order oldOrder = *loc.order_it;
+        
+        orderReceived newOrder = orderReceived(modOrder.price.value(), oldOrder.quantity, loc.side, std::chrono::system_clock::now(), oldOrder.order_id);
+        if (DEBUGMODE) {
+            printf("Order ID to Modify: %d \n", modOrder.order_id);
+            printf("Old order values: order_id %d, and quantity %d \n", oldOrder.order_id, oldOrder.quantity);
+            printf("Change price_index from %d to %d \n", loc.price_index, priceToIdx(modOrder.price.value()));
+            fflush(stdout);
+        }
+        CheckLookUpMap(lookUpMap);
+        // Erase the original order from the deque and delete for LookupMap. It will be re-added later on addLimitOrder
+        book[loc.price_index].erase(loc.order_it); 
+        lookUpMap.erase(modOrder.order_id);
+        // Re-add as a new limit order
+        if (DEBUGMODE) printf("Calling addLimitOrder for order %d\n", modOrder.order_id);
+        std::vector<int32_t> canOrders = addLimitOrder(newOrder);
+        if (DEBUGMODE) printf("Returned from addLimitOrder for order %d\n", modOrder.order_id);
+        // Check that teh full lookUpMap is correct
+        CheckLookUpMap(lookUpMap);
+        return canOrders;
+    }
+}
+
+void orderBook::CheckLookUpMap(std::unordered_map<std::int32_t, OrderLocation> lookUpMap) {
+    for (auto pair: lookUpMap) {
+        int32_t key = pair.first;
+        OrderLocation &loc = pair.second;
+        if (key != loc.order_it->order_id) {
+            printf("Error during checking the lookUpMap is legit for order %d \n", key);
+            fflush(stdout);
+            printf("Stop");
+        }
+
+    std::unordered_map<const void*, std::vector<int32_t>> pointerToKeys;
+    for (const auto& [key, loc] : lookUpMap) {
+        const void* ptr = static_cast<const void*>(&(*loc.order_it));
+        pointerToKeys[ptr].push_back(key);
+    }
+
+    for (const auto& [ptr, keys] : pointerToKeys) {
+        if (keys.size() > 1) {
+            printf("💣 Multiple keys share the same iterator address: ");
+            for (int id : keys) printf("%d ", id);
+            fflush(stdout);
+            printf("\n");
+        }
+    }
+    }
+}
+
+void orderBook::recCancelOrders(amendOrder canOrder) {
+    // TODO: return a number and then make that orderGenerator receive that and ackCancel with that ID
+    CheckLookUpMap(lookUpMap);
+    OrderLocation loc = lookUpMap[canOrder.order_id];
     std::array<std::deque<order>, MAXTICKS> &book = (loc.side == Side::Sell) ? askBook : bidBook;
-    const order oldOrder = *loc.order_it;
-    orderReceived newOrder(modOrder.price.value(), oldOrder.quantity, loc.side, std::chrono::system_clock::now(), oldOrder.order_id);
-    // Erase the original order from the deque and delete for LookupMap. It will be re-added later on addLimitOrder
-    book[loc.price_index].erase(loc.order_it);
-    lookUpMap.erase(modOrder.order_id);
-    // Re-add as a new limit order
-    addLimitOrder(newOrder);
+    if (DEBUGMODE) printf("On the order Book: We'll cancel order ID %d \n", canOrder.order_id);
+    // Erase the original order from the deque and delete for LookupMap
+    CheckLookUpMap(lookUpMap);
+    book[loc.price_index].erase(loc.order_it); 
+    CheckLookUpMap(lookUpMap);
+    lookUpMap.erase(canOrder.order_id);
+    CheckLookUpMap(lookUpMap);
 }
 
 std::vector<int32_t> orderBook::matchOrder(order &cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx) {
@@ -64,25 +131,48 @@ std::vector<int32_t> orderBook::matchOrder(order &cleanRec, std::int32_t priceId
             }
         }
     }
-    // push leftover if not fully filled
     if (cleanRec.quantity > 0) {
+        // push leftover if not fully filled
         pushOrder(cleanRec, priceIdx, side);
+    } else {
+        if (DEBUGMODE) printf("Filled at origin %d \n", cleanRec.order_id);
+        // Add to the vector of cancel orders if the quantity is zero
+        matchedOrder.push_back(cleanRec.order_id);
     }
+    CheckLookUpMap(lookUpMap);
     return matchedOrder;
 }
 
 // method for pushing a price into the book in case we don't find any match for it
-std::vector<int32_t> orderBook::pushOrder(const order& cleanRec, const std::int32_t priceIdx, const Side side) {
+std::vector<int32_t> orderBook::pushOrder(order cleanRec, std::int32_t priceIdx, Side side) {
     std::array<std::deque<order>, MAXTICKS> &desiredBook = (side == Side::Sell) ? askBook : bidBook;
     std::int32_t &bestPxIdx = (side == Side::Sell) ? bestAskIdx : bestBidIdx;
+    CheckLookUpMap(lookUpMap);
     // updating bestAsk/bestBid in case new order is better and not matching
     if (side == Side::Sell) {
         bestPxIdx=(priceIdx < bestPxIdx) ? priceIdx : bestPxIdx;
     } else {
         bestPxIdx=(priceIdx > bestPxIdx) ? priceIdx : bestPxIdx;
     }
+    CheckLookUpMap(lookUpMap); // pre-check
+    // Check for multiple orderId
+    for (const order& o : desiredBook[priceIdx]) {
+        if (o.order_id == cleanRec.order_id) {
+            printf("💣 Order ID %d already exists in desiredBook[%d]! Risk of aliasing!\n", cleanRec.order_id, priceIdx);
+            exit(EXIT_FAILURE);
+            }
+    }
     desiredBook[priceIdx].push_back(cleanRec);  
-    lookUpMap.emplace(cleanRec.order_id, OrderLocation(side, priceIdx, std::prev(desiredBook[priceIdx].end())));
+    CheckLookUpMap(lookUpMap); // post-check
+    auto it = std::prev(desiredBook[priceIdx].end());
+    CheckLookUpMap(lookUpMap);
+    auto [_, success] = lookUpMap.emplace(cleanRec.order_id, OrderLocation(side, priceIdx, it));
+    // Check for duplicate orderId
+    if (!success) {
+        printf("❌ Attempt to insert duplicate order_id = %d into lookUpMap\n", cleanRec.order_id);
+        exit(EXIT_FAILURE);
+    }
+    CheckLookUpMap(lookUpMap);
     return {};
 }
 
@@ -106,8 +196,12 @@ std::vector<int32_t> orderBook::matchAtPriceLevel(std::deque<order> &level, orde
 
 
         if (matchingOrder.quantity == 0) {
+            if (DEBUGMODE) printf("Matched Order %d \n", matchingOrder.order_id);
+            // Saving element into matchedId to pass cancel order to the client
             matchedId.push_back(matchingOrder.order_id);
             lookUpMap.erase(matchingOrder.order_id);
+            CheckLookUpMap(lookUpMap);
+            // Delete the matched order with q = 0 from the level
             level.pop_front();
         }
     }
@@ -175,7 +269,13 @@ double generateRandomPrice(double min, double max) {
     // or thread local also heps
     static std::mt19937 rng(std::random_device{}());
     std::uniform_real_distribution<double> dist(min, max);
-    return std::round(dist(rng)*100)/100;
+    return std::round(dist(rng)/TICKSIZE)*TICKSIZE;
+}
+
+std::int32_t generateRandomInt(std::int32_t min, std::int32_t max) {
+    static std::mt19937 rng(std::random_device{}());
+    std::uniform_int_distribution<int32_t> dist(min, max);
+    return dist(rng);
 }
 
 Side generateSide() {
@@ -190,20 +290,22 @@ void orderGenerator::ackCancel(std::int32_t orderId) {
     // Algorithm so you can change the elements efficiently and deletes from record
     std::swap(activeIds[idx], activeIds.back());
     idToIdx[activeIds[idx]] = idx;   // update index of swapped element
+    printf("Deleting %d from Active Ids in OrderGen \n", orderId);
+    fflush(stdout);
     activeIds.pop_back();
     idToIdx.erase(orderId);
 }
 
 amendOrder orderGenerator::cancelOrders() {
-    std::int32_t randomId = activeIds[generateRandomPrice(0, static_cast<double>(activeIds.size()))];
-    auto idx = idToIdx[randomId];
-    // Algorithm so you can change the elements efficiently and deletes from record
+    std::int32_t randomId = activeIds[generateRandomInt(0, activeIds.size() - 1)];
+    printf("On the gen Book: We'll cancel order ID %d \n", randomId);
+    fflush(stdout);
     ackCancel(randomId);
     return amendOrder(randomId, action::cancel);
 }
 
 amendOrder orderGenerator::modifyOrders() {
-    std::int32_t randomId = activeIds[generateRandomPrice(0, static_cast<double>(activeIds.size()))];
+    std::int32_t randomId = activeIds[generateRandomInt(0, activeIds.size() - 1)];
     return amendOrder(randomId, action::modify, generateRandomPrice(MINPRICE, MAXPRICE - TICKSIZE));
 }
 
@@ -212,7 +314,7 @@ orderGenerator::orderGenerator() : idGenerated(1) {}
 
 orderReceived orderGenerator::generateOrder(){
     // we define an order from random variables (side and price)
-    orderReceived o(generateRandomPrice(MINPRICE, MAXPRICE - TICKSIZE), static_cast<std::int32_t>(generateRandomPrice(1,10)),
+    orderReceived o(generateRandomPrice(MINPRICE, MAXPRICE - TICKSIZE), generateRandomInt(1,10),
         generateSide(), std::chrono::system_clock::now(), idGenerated++);
     // Add active ID to the activeIds and idToIdx
     activeIds.push_back(o.order_id);

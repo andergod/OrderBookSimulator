@@ -71,33 +71,35 @@ enum class action:bool {
 };
 
 struct amendOrder {
-    const std::int32_t order_id;
-    const action act;
-    const std::optional<double> price;
-    amendOrder(const std::int32_t id, const action a, const std::optional<double> p = std::nullopt)
+    std::int32_t order_id;
+    action act;
+    std::optional<double> price;
+    amendOrder(std::int32_t id, action a, std::optional<double> p = std::nullopt)
     : order_id(id), act(a), price(p) {}
 };
 
 class orderBook{
     private:
-        std::vector<int32_t> pushOrder (const order &received, const std::int32_t priceIdx, const Side side);
+        std::vector<int32_t> pushOrder (order received, std::int32_t priceIdx, Side side);
         std::vector<int32_t> matchOrder(order &cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
         Side oppositeSide(const Side side);
         void updateNextWorstPxIdx(const Side side);
         std::vector<int32_t> matchAtPriceLevel(std::deque<order> &level, order &cleanRec);
         std::int32_t priceToIdx(const double price);
-        void recModOrders(amendOrder modOrder);
         std::unordered_map<std::int32_t, OrderLocation> lookUpMap;
         std::array<std::deque<order>, MAXTICKS> bidBook;
         std::array<std::deque<order>, MAXTICKS> askBook;
         std::int32_t bestBidIdx = -1;
         std::int32_t bestAskIdx = MAXTICKS;
         std::int32_t idCounter;
+        void CheckLookUpMap (std::unordered_map<std::int32_t, OrderLocation> lookUpMap);
     public:
         //orderBook definition    
         orderBook();
         // method for adding a limit order into the order book and match it if necessary
-        std::vector<int32_t> addLimitOrder(orderReceived &received);
+        std::vector<int32_t> addLimitOrder(orderReceived received);
+        std::vector<int32_t> recModOrders(amendOrder modOrder);
+        void recCancelOrders(amendOrder modOrder);
         // show the contect of the book
         void showBook();
         void showLookUpMap();
@@ -110,6 +112,7 @@ class orderGenerator{
         // keep count of the Ids for each order generated
         std::int32_t idGenerated;
         std::vector<std::int32_t> activeIds;
+        // Use for random selection of Ids for cancel and ammends
         std::unordered_map<std::int32_t, std::size_t> idToIdx;
     public:
         // class definition
