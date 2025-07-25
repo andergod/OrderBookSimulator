@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include "config.hpp"
 #include <optional>
+#include <memory>  
 
 enum class Side:bool {
     Buy = false,
@@ -51,10 +52,10 @@ struct trade
 struct OrderLocation {
     Side side;                   
     std::int32_t price_index;      
-    std::deque<order>::iterator order_it; // Iterator pointing to the order inside the deque
+    std::shared_ptr<order> order_pt; // smart pointer
     OrderLocation() = default;
-    OrderLocation(const Side s, std::int32_t pxIdx, std::deque<order>::iterator it)
-    : side(s), price_index(pxIdx), order_it(it) {}
+    OrderLocation(const Side s, std::int32_t pxIdx, std::shared_ptr<order> it)
+    : side(s), price_index(pxIdx), order_pt(it) {}
 };
 
 struct tradeRecord
@@ -80,19 +81,19 @@ struct amendOrder {
 
 class orderBook{
     private:
-        std::vector<int32_t> pushOrder (order received, std::int32_t priceIdx, Side side);
-        std::vector<int32_t> matchOrder(order &cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
+        std::vector<int32_t> pushOrder (std::shared_ptr<order> received, std::int32_t priceIdx, Side side);
+        std::vector<int32_t> matchOrder(std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
         Side oppositeSide(const Side side);
         void updateNextWorstPxIdx(const Side side);
-        std::vector<int32_t> matchAtPriceLevel(std::deque<order> &level, order &cleanRec);
+        std::vector<int32_t> matchAtPriceLevel(std::deque<std::shared_ptr<order>> &level, std::shared_ptr<order> &cleanRec);
         std::int32_t priceToIdx(const double price);
         std::unordered_map<std::int32_t, OrderLocation> lookUpMap;
-        std::array<std::deque<order>, MAXTICKS> bidBook;
-        std::array<std::deque<order>, MAXTICKS> askBook;
+        std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> bidBook;
+        std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> askBook;
         std::int32_t bestBidIdx = -1;
         std::int32_t bestAskIdx = MAXTICKS;
         std::int32_t idCounter;
-        void CheckLookUpMap (std::unordered_map<std::int32_t, OrderLocation> lookUpMap);
+        void CheckLookUpMap (std::unordered_map<std::int32_t, OrderLocation> &lookUpMap);
     public:
         //orderBook definition    
         orderBook();

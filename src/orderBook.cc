@@ -10,6 +10,8 @@
 #include <iomanip>
 #include <unordered_map>
 #include <array>
+#include <memory>  
+#include <algorithm>
 
 /**
  * @brief Prints out hello world and tests the JSON Lib.
@@ -20,19 +22,19 @@
 orderBook::orderBook() : idCounter(1) {}
 
 std::vector<int32_t> orderBook::addLimitOrder(orderReceived received) {
-    order cleanRec(received.order_id, received.quantity, std::chrono::system_clock::now());
+    std::shared_ptr<order> cleanRecPt = std::make_shared<order>(received.order_id, received.quantity, std::chrono::system_clock::now());
     std::int32_t priceIdx = priceToIdx(received.price);
     std::int32_t bestPxIdx = (received.side == Side::Sell) ? bestBidIdx : bestAskIdx;
     // If sell then make it priceIdx <= bestPxIdex
     bool condition = (received.side == Side::Sell) ? (priceIdx <= bestPxIdx) : (priceIdx >= bestPxIdx);
     if (DEBUGMODE) {
-        printf("Adding limit order for Id %d \n", cleanRec.order_id);
+        printf("Adding limit order for Id %d \n", cleanRecPt->order_id);
         printf("Index Location: %d; ", priceIdx);
         printf("Side: %d; ", received.side);
-        printf("Quantity: %d \n", cleanRec.quantity);
+        printf("Quantity: %d \n", cleanRecPt->quantity);
         fflush(stdout);
     }
-    return (condition) ? matchOrder(cleanRec, priceIdx, received.side, bestPxIdx) : pushOrder(cleanRec, priceIdx, received.side);
+    return (condition) ? matchOrder(cleanRecPt, priceIdx, received.side, bestPxIdx) : pushOrder(cleanRecPt, priceIdx, received.side);
 }
 
 std::vector<int32_t> orderBook::recModOrders(amendOrder modOrder) {
@@ -42,9 +44,9 @@ std::vector<int32_t> orderBook::recModOrders(amendOrder modOrder) {
         return {};
     } else {
         OrderLocation &loc = it->second;
-        std::array<std::deque<order>, MAXTICKS> &book = (loc.side == Side::Sell) ? askBook : bidBook;
+        std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> &book = (loc.side == Side::Sell) ? askBook : bidBook;
         // I will bet this will break something, as I am adding it to a deque, where needs to be copied
-        order oldOrder = *loc.order_it;
+        order oldOrder = *loc.order_pt;
         
         orderReceived newOrder = orderReceived(modOrder.price.value(), oldOrder.quantity, loc.side, std::chrono::system_clock::now(), oldOrder.order_id);
         if (DEBUGMODE) {
@@ -53,68 +55,50 @@ std::vector<int32_t> orderBook::recModOrders(amendOrder modOrder) {
             printf("Change price_index from %d to %d \n", loc.price_index, priceToIdx(modOrder.price.value()));
             fflush(stdout);
         }
-        CheckLookUpMap(lookUpMap);
         // Erase the original order from the deque and delete for LookupMap. It will be re-added later on addLimitOrder
-        book[loc.price_index].erase(loc.order_it); 
+        auto& dq = book[loc.price_index];
+        auto it = std::find(dq.begin(), dq.end(), loc.order_pt);
+        dq.erase(it);
         lookUpMap.erase(modOrder.order_id);
         // Re-add as a new limit order
         if (DEBUGMODE) printf("Calling addLimitOrder for order %d\n", modOrder.order_id);
         std::vector<int32_t> canOrders = addLimitOrder(newOrder);
         if (DEBUGMODE) printf("Returned from addLimitOrder for order %d\n", modOrder.order_id);
         // Check that teh full lookUpMap is correct
-        CheckLookUpMap(lookUpMap);
         return canOrders;
     }
 }
 
-void orderBook::CheckLookUpMap(std::unordered_map<std::int32_t, OrderLocation> lookUpMap) {
-    for (auto pair: lookUpMap) {
+void orderBook::CheckLookUpMap(std::unordered_map<std::int32_t, OrderLocation> &lookUpMap) {
+    for (auto &pair: lookUpMap) {
         int32_t key = pair.first;
         OrderLocation &loc = pair.second;
-        if (key != loc.order_it->order_id) {
+        if (key != loc.order_pt->order_id) {
             printf("Error during checking the lookUpMap is legit for order %d \n", key);
             fflush(stdout);
             printf("Stop");
         }
-
-    std::unordered_map<const void*, std::vector<int32_t>> pointerToKeys;
-    for (const auto& [key, loc] : lookUpMap) {
-        const void* ptr = static_cast<const void*>(&(*loc.order_it));
-        pointerToKeys[ptr].push_back(key);
-    }
-
-    for (const auto& [ptr, keys] : pointerToKeys) {
-        if (keys.size() > 1) {
-            printf("💣 Multiple keys share the same iterator address: ");
-            for (int id : keys) printf("%d ", id);
-            fflush(stdout);
-            printf("\n");
-        }
-    }
     }
 }
 
 void orderBook::recCancelOrders(amendOrder canOrder) {
-    // TODO: return a number and then make that orderGenerator receive that and ackCancel with that ID
-    CheckLookUpMap(lookUpMap);
     OrderLocation loc = lookUpMap[canOrder.order_id];
-    std::array<std::deque<order>, MAXTICKS> &book = (loc.side == Side::Sell) ? askBook : bidBook;
+    std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> &book = (loc.side == Side::Sell) ? askBook : bidBook;
     if (DEBUGMODE) printf("On the order Book: We'll cancel order ID %d \n", canOrder.order_id);
     // Erase the original order from the deque and delete for LookupMap
-    CheckLookUpMap(lookUpMap);
-    book[loc.price_index].erase(loc.order_it); 
-    CheckLookUpMap(lookUpMap);
+    auto& dq = book[loc.price_index];
+    auto it = std::find(dq.begin(), dq.end(), loc.order_pt);
+    dq.erase(it);
     lookUpMap.erase(canOrder.order_id);
-    CheckLookUpMap(lookUpMap);
 }
 
-std::vector<int32_t> orderBook::matchOrder(order &cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx) {
+std::vector<int32_t> orderBook::matchOrder(std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx) {
     // active orders
-    std::array<std::deque<order>, MAXTICKS> &book = (side == Side::Sell) ? bidBook : askBook;
+    std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> &book = (side == Side::Sell) ? bidBook : askBook;
     std::vector<int32_t> matchedOrder;
     if (side == Side::Sell) {
         // sell order → match against bids (high to low)
-        for (int px = bestPxIdx; px >= priceIdx && cleanRec.quantity > 0; --px) {
+        for (int px = bestPxIdx; px >= priceIdx && cleanRec->quantity > 0; --px) {
             std::vector<int32_t> atPriceMatched = matchAtPriceLevel(book[px], cleanRec);
             matchedOrder.insert(matchedOrder.end(), atPriceMatched.begin(), atPriceMatched.end());
             if (book[px].empty() && px == bestPxIdx) {
@@ -123,7 +107,7 @@ std::vector<int32_t> orderBook::matchOrder(order &cleanRec, std::int32_t priceId
         }
     } else {
         // buy order → match against asks (low to high)
-        for (int px = bestPxIdx; px <= priceIdx && cleanRec.quantity > 0; ++px) {
+        for (int px = bestPxIdx; px <= priceIdx && cleanRec->quantity > 0; ++px) {
             std::vector<int32_t> atPriceMatched = matchAtPriceLevel(book[px], cleanRec);
             matchedOrder.insert(matchedOrder.end(), atPriceMatched.begin(), atPriceMatched.end());
             if (book[px].empty() && px == bestPxIdx) {
@@ -131,48 +115,29 @@ std::vector<int32_t> orderBook::matchOrder(order &cleanRec, std::int32_t priceId
             }
         }
     }
-    if (cleanRec.quantity > 0) {
+    if (cleanRec->quantity > 0) {
         // push leftover if not fully filled
         pushOrder(cleanRec, priceIdx, side);
     } else {
-        if (DEBUGMODE) printf("Filled at origin %d \n", cleanRec.order_id);
+        if (DEBUGMODE) printf("Filled at origin %d \n", cleanRec->order_id);
         // Add to the vector of cancel orders if the quantity is zero
-        matchedOrder.push_back(cleanRec.order_id);
+        matchedOrder.push_back(cleanRec->order_id);
     }
-    CheckLookUpMap(lookUpMap);
     return matchedOrder;
 }
 
 // method for pushing a price into the book in case we don't find any match for it
-std::vector<int32_t> orderBook::pushOrder(order cleanRec, std::int32_t priceIdx, Side side) {
-    std::array<std::deque<order>, MAXTICKS> &desiredBook = (side == Side::Sell) ? askBook : bidBook;
+std::vector<int32_t> orderBook::pushOrder(std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side) {
+    std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> &desiredBook = (side == Side::Sell) ? askBook : bidBook;
     std::int32_t &bestPxIdx = (side == Side::Sell) ? bestAskIdx : bestBidIdx;
-    CheckLookUpMap(lookUpMap);
     // updating bestAsk/bestBid in case new order is better and not matching
     if (side == Side::Sell) {
         bestPxIdx=(priceIdx < bestPxIdx) ? priceIdx : bestPxIdx;
     } else {
         bestPxIdx=(priceIdx > bestPxIdx) ? priceIdx : bestPxIdx;
     }
-    CheckLookUpMap(lookUpMap); // pre-check
-    // Check for multiple orderId
-    for (const order& o : desiredBook[priceIdx]) {
-        if (o.order_id == cleanRec.order_id) {
-            printf("💣 Order ID %d already exists in desiredBook[%d]! Risk of aliasing!\n", cleanRec.order_id, priceIdx);
-            exit(EXIT_FAILURE);
-            }
-    }
     desiredBook[priceIdx].push_back(cleanRec);  
-    CheckLookUpMap(lookUpMap); // post-check
-    auto it = std::prev(desiredBook[priceIdx].end());
-    CheckLookUpMap(lookUpMap);
-    auto [_, success] = lookUpMap.emplace(cleanRec.order_id, OrderLocation(side, priceIdx, it));
-    // Check for duplicate orderId
-    if (!success) {
-        printf("❌ Attempt to insert duplicate order_id = %d into lookUpMap\n", cleanRec.order_id);
-        exit(EXIT_FAILURE);
-    }
-    CheckLookUpMap(lookUpMap);
+    lookUpMap.emplace(cleanRec->order_id, OrderLocation(side, priceIdx, cleanRec));
     return {};
 }
 
@@ -186,21 +151,20 @@ void orderBook::updateNextWorstPxIdx(const Side side) {
     bestPxIdx = px;
 }
 
-std::vector<int32_t> orderBook::matchAtPriceLevel(std::deque<order> &level, order &cleanRec) {
+std::vector<int32_t> orderBook::matchAtPriceLevel(std::deque<std::shared_ptr<order>> &level, std::shared_ptr<order> &cleanRec) {
     std::vector<int32_t> matchedId;
-    while (!level.empty() && cleanRec.quantity > 0) {
-        order &matchingOrder = level.front();
-        std::int32_t trades = std::min(cleanRec.quantity, matchingOrder.quantity);
-        matchingOrder.quantity -= trades;
-        cleanRec.quantity -= trades;
+    while (!level.empty() && cleanRec->quantity > 0) {
+        std::shared_ptr<order> &matchingOrder = level.front();
+        std::int32_t trades = std::min(cleanRec->quantity, matchingOrder->quantity);
+        matchingOrder->quantity -= trades;
+        cleanRec->quantity -= trades;
 
 
-        if (matchingOrder.quantity == 0) {
-            if (DEBUGMODE) printf("Matched Order %d \n", matchingOrder.order_id);
+        if (matchingOrder->quantity == 0) {
+            if (DEBUGMODE) printf("Matched Order %d \n", matchingOrder->order_id);
             // Saving element into matchedId to pass cancel order to the client
-            matchedId.push_back(matchingOrder.order_id);
-            lookUpMap.erase(matchingOrder.order_id);
-            CheckLookUpMap(lookUpMap);
+            matchedId.push_back(matchingOrder->order_id);
+            lookUpMap.erase(matchingOrder->order_id);
             // Delete the matched order with q = 0 from the level
             level.pop_front();
         }
@@ -218,7 +182,7 @@ Side orderBook::oppositeSide(const Side side) {
 
 void orderBook::showBook() {
     // iterate over each price of the order book
-    using BookLevel = std::array<std::deque<order>, MAXTICKS>;
+    using BookLevel = std::array<std::deque<std::shared_ptr<order>>, MAXTICKS>;
     // Because i am making a array of references, I can't put them in a container
     // So, when references aren't enough, I use pointers which difficult the verbosity but are more flexibles
     std::array<BookLevel*, 2> orderBook = {&askBook, &bidBook};
@@ -228,7 +192,7 @@ void orderBook::showBook() {
         BookLevel& book = *orderBook[j];
         for (std::int32_t i=0; i<book.size(); ++i) {
             double price = (i*TICKSIZE) + MINPRICE;
-            const std::deque<order>&ordersAtPrice= book[i]; // The vector of orders at this price
+            const std::deque<std::shared_ptr<order> >&ordersAtPrice= book[i]; // The vector of orders at this price
             if (ordersAtPrice.empty()) {
                 continue;
             }
@@ -237,12 +201,12 @@ void orderBook::showBook() {
             // iterate over each side (buy and sell) in a determined price
             for (std::int32_t k=0; k<std::min<std::size_t>(2, ordersAtPrice.size()); ++k) {
                 const auto& o = ordersAtPrice[k];
-                std::time_t orderTime = std::chrono::system_clock::to_time_t(o.timestamp);
+                std::time_t orderTime = std::chrono::system_clock::to_time_t(o->timestamp);
                 std::tm tm_order = *std::localtime(&orderTime);
 
                 // show the relevant values
-                std::cout << "  Order ID: " << o.order_id
-                        << ", Quantity: " << o.quantity
+                std::cout << "  Order ID: " << o->order_id
+                        << ", Quantity: " << o->quantity
                         << ", timestamp: " << std::put_time(&tm_order, "%Y-%m-%d %H:%M:%S")  << std::endl;
             }
             
@@ -290,15 +254,14 @@ void orderGenerator::ackCancel(std::int32_t orderId) {
     // Algorithm so you can change the elements efficiently and deletes from record
     std::swap(activeIds[idx], activeIds.back());
     idToIdx[activeIds[idx]] = idx;   // update index of swapped element
-    printf("Deleting %d from Active Ids in OrderGen \n", orderId);
-    fflush(stdout);
+    if (DEBUGMODE) printf("Deleting %d from Active Ids in OrderGen \n", orderId);
     activeIds.pop_back();
     idToIdx.erase(orderId);
 }
 
 amendOrder orderGenerator::cancelOrders() {
     std::int32_t randomId = activeIds[generateRandomInt(0, activeIds.size() - 1)];
-    printf("On the gen Book: We'll cancel order ID %d \n", randomId);
+    if (DEBUGMODE) printf("On the gen Book: We'll cancel order ID %d \n", randomId);
     fflush(stdout);
     ackCancel(randomId);
     return amendOrder(randomId, action::cancel);
