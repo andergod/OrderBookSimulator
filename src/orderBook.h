@@ -81,29 +81,44 @@ struct amendOrder {
 
 class orderBook{
     private:
+        virtual Side oppositeSide(const Side side) = 0;
+        virtual void updateNextWorstPxIdx(const Side side) = 0;
+        virtual std::int32_t priceToIdx(const double price) = 0;
+        virtual void CheckLookUpMap (std::unordered_map<std::int32_t, OrderLocation> &lookUpMap) = 0;      
+    public:
+        virtual ~orderBook() = default;
+        virtual std::vector<int32_t> addLimitOrder(orderReceived received) = 0;
+        virtual std::vector<int32_t> recModOrders(amendOrder modOrder) = 0;
+        virtual void recCancelOrders(amendOrder modOrder) = 0; 
+        // show the contect of the book
+        virtual void showBook() = 0;
+        virtual void showLookUpMap() = 0;
+};
+
+class dequeOrderBook : public orderBook{
+    private:
         std::vector<int32_t> pushOrder (std::shared_ptr<order> received, std::int32_t priceIdx, Side side);
         std::vector<int32_t> matchOrder(std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
-        Side oppositeSide(const Side side);
-        void updateNextWorstPxIdx(const Side side);
+        Side oppositeSide(const Side side) override;
+        void updateNextWorstPxIdx(const Side side) override;
         std::vector<int32_t> matchAtPriceLevel(std::deque<std::shared_ptr<order>> &level, std::shared_ptr<order> &cleanRec);
-        std::int32_t priceToIdx(const double price);
+        std::int32_t priceToIdx(const double price) override;
         std::unordered_map<std::int32_t, OrderLocation> lookUpMap;
         std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> bidBook;
         std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> askBook;
         std::int32_t bestBidIdx = -1;
         std::int32_t bestAskIdx = MAXTICKS;
-        std::int32_t idCounter;
-        void CheckLookUpMap (std::unordered_map<std::int32_t, OrderLocation> &lookUpMap);
+        void CheckLookUpMap (std::unordered_map<std::int32_t, OrderLocation> &lookUpMap) override;
     public:
         //orderBook definition    
-        orderBook();
+        dequeOrderBook();
         // method for adding a limit order into the order book and match it if necessary
-        std::vector<int32_t> addLimitOrder(orderReceived received);
-        std::vector<int32_t> recModOrders(amendOrder modOrder);
-        void recCancelOrders(amendOrder modOrder);
+        std::vector<int32_t> addLimitOrder(orderReceived received) override;
+        std::vector<int32_t> recModOrders(amendOrder modOrder) override;
+        void recCancelOrders(amendOrder modOrder) override;
         // show the contect of the book
-        void showBook();
-        void showLookUpMap();
+        void showBook() override;
+        void showLookUpMap() override;
         // vector that holds the trades
         std::vector<tradeRecord> trades;
 }; 

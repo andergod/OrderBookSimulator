@@ -12,7 +12,7 @@ int main()
     // For loggin all prints
     freopen("log.txt", "w", stdout);
   
-    orderBook Book;
+    dequeOrderBook Book;
     orderGenerator generator;
 
     // timer initialized     

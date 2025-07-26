@@ -19,9 +19,9 @@
  */
 
 // Order book definition
-orderBook::orderBook() : idCounter(1) {}
+dequeOrderBook::dequeOrderBook() {}
 
-std::vector<int32_t> orderBook::addLimitOrder(orderReceived received) {
+std::vector<int32_t> dequeOrderBook::addLimitOrder(orderReceived received) {
     std::shared_ptr<order> cleanRecPt = std::make_shared<order>(received.order_id, received.quantity, std::chrono::system_clock::now());
     std::int32_t priceIdx = priceToIdx(received.price);
     std::int32_t bestPxIdx = (received.side == Side::Sell) ? bestBidIdx : bestAskIdx;
@@ -37,7 +37,7 @@ std::vector<int32_t> orderBook::addLimitOrder(orderReceived received) {
     return (condition) ? matchOrder(cleanRecPt, priceIdx, received.side, bestPxIdx) : pushOrder(cleanRecPt, priceIdx, received.side);
 }
 
-std::vector<int32_t> orderBook::recModOrders(amendOrder modOrder) {
+std::vector<int32_t> dequeOrderBook::recModOrders(amendOrder modOrder) {
     auto it = lookUpMap.find(modOrder.order_id);
     if (it == lookUpMap.end()) {
         printf("Order Not found, double check code");
@@ -69,7 +69,7 @@ std::vector<int32_t> orderBook::recModOrders(amendOrder modOrder) {
     }
 }
 
-void orderBook::CheckLookUpMap(std::unordered_map<std::int32_t, OrderLocation> &lookUpMap) {
+void dequeOrderBook::CheckLookUpMap(std::unordered_map<std::int32_t, OrderLocation> &lookUpMap) {
     for (auto &pair: lookUpMap) {
         int32_t key = pair.first;
         OrderLocation &loc = pair.second;
@@ -81,7 +81,7 @@ void orderBook::CheckLookUpMap(std::unordered_map<std::int32_t, OrderLocation> &
     }
 }
 
-void orderBook::recCancelOrders(amendOrder canOrder) {
+void dequeOrderBook::recCancelOrders(amendOrder canOrder) {
     OrderLocation loc = lookUpMap[canOrder.order_id];
     std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> &book = (loc.side == Side::Sell) ? askBook : bidBook;
     if (DEBUGMODE) printf("On the order Book: We'll cancel order ID %d \n", canOrder.order_id);
@@ -92,7 +92,7 @@ void orderBook::recCancelOrders(amendOrder canOrder) {
     lookUpMap.erase(canOrder.order_id);
 }
 
-std::vector<int32_t> orderBook::matchOrder(std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx) {
+std::vector<int32_t> dequeOrderBook::matchOrder(std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx) {
     // active orders
     std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> &book = (side == Side::Sell) ? bidBook : askBook;
     std::vector<int32_t> matchedOrder;
@@ -127,7 +127,7 @@ std::vector<int32_t> orderBook::matchOrder(std::shared_ptr<order> cleanRec, std:
 }
 
 // method for pushing a price into the book in case we don't find any match for it
-std::vector<int32_t> orderBook::pushOrder(std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side) {
+std::vector<int32_t> dequeOrderBook::pushOrder(std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side) {
     std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> &desiredBook = (side == Side::Sell) ? askBook : bidBook;
     std::int32_t &bestPxIdx = (side == Side::Sell) ? bestAskIdx : bestBidIdx;
     // updating bestAsk/bestBid in case new order is better and not matching
@@ -141,7 +141,7 @@ std::vector<int32_t> orderBook::pushOrder(std::shared_ptr<order> cleanRec, std::
     return {};
 }
 
-void orderBook::updateNextWorstPxIdx(const Side side) {
+void dequeOrderBook::updateNextWorstPxIdx(const Side side) {
     std::int32_t &bestPxIdx = (side == Side::Sell) ? bestBidIdx : bestAskIdx;
     auto& book = (side==Side::Sell) ? bidBook : askBook;
     std::int32_t px = bestPxIdx;
@@ -151,7 +151,7 @@ void orderBook::updateNextWorstPxIdx(const Side side) {
     bestPxIdx = px;
 }
 
-std::vector<int32_t> orderBook::matchAtPriceLevel(std::deque<std::shared_ptr<order>> &level, std::shared_ptr<order> &cleanRec) {
+std::vector<int32_t> dequeOrderBook::matchAtPriceLevel(std::deque<std::shared_ptr<order>> &level, std::shared_ptr<order> &cleanRec) {
     std::vector<int32_t> matchedId;
     while (!level.empty() && cleanRec->quantity > 0) {
         std::shared_ptr<order> &matchingOrder = level.front();
@@ -172,15 +172,15 @@ std::vector<int32_t> orderBook::matchAtPriceLevel(std::deque<std::shared_ptr<ord
     return matchedId;
 }
 
-std::int32_t  orderBook::priceToIdx(const double price) {
+std::int32_t  dequeOrderBook::priceToIdx(const double price) {
     return static_cast<std::int32_t>((price - MINPRICE)/TICKSIZE);
 }
 
-Side orderBook::oppositeSide(const Side side) {
+Side dequeOrderBook::oppositeSide(const Side side) {
     return static_cast<Side>(!static_cast<bool>(side));
 }
 
-void orderBook::showBook() {
+void dequeOrderBook::showBook() {
     // iterate over each price of the order book
     using BookLevel = std::array<std::deque<std::shared_ptr<order>>, MAXTICKS>;
     // Because i am making a array of references, I can't put them in a container
@@ -216,7 +216,7 @@ void orderBook::showBook() {
     std::cout << "Best Bid: " << (bestBidIdx*TICKSIZE) + MINPRICE << std::endl;
 }
 
-void orderBook::showLookUpMap () {
+void dequeOrderBook::showLookUpMap () {
     int count = 0;
     for (const auto& entry : lookUpMap) {
         std::cout << "Order ID: " << entry.first << std::endl;
