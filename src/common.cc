@@ -1,0 +1,39 @@
+#include <cstdint>
+#include <iostream>
+#include <map>
+#include "orderBook.h"
+#include "config.hpp"
+#include <random>
+#include <cmath>
+#include <vector>
+#include <ctime>
+#include <iomanip>
+#include <unordered_map>
+#include <array>
+#include <memory>  
+#include <algorithm>
+
+/**
+ * @brief Prints out hello world and tests the JSON Lib.
+ *
+ */
+double generateRandomPrice(double min, double max) {
+    // generate random price for orders
+    // or thread local also heps
+    static std::mt19937 rng(std::random_device{}());
+    std::uniform_real_distribution<double> dist(min, max);
+    return std::round(dist(rng)/TICKSIZE)*TICKSIZE;
+}
+
+std::int32_t generateRandomInt(std::int32_t min, std::int32_t max) {
+    static std::mt19937 rng(std::random_device{}());
+    std::uniform_int_distribution<int32_t> dist(min, max);
+    return dist(rng);
+}
+
+Side generateSide() {
+    // generate random side for orders
+    std::mt19937 rng(std::random_device{}());
+    std::bernoulli_distribution dist(0.5);
+    return static_cast<Side>(dist(rng));
+}
