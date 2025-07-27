@@ -58,6 +58,15 @@ struct OrderLocation {
     : side(s), price_index(pxIdx), order_pt(it) {}
 };
 
+struct OrderLocationIntrusive {
+    Side side;                   
+    std::int32_t price_index;      
+    OrderIntrusive* order_pt; // smart pointer
+    OrderLocationIntrusive() = default;
+    OrderLocationIntrusive(const Side s, std::int32_t pxIdx, OrderIntrusive* it)
+    : side(s), price_index(pxIdx), order_pt(it) {}
+};
+
 struct tradeRecord
 {
     // tradeRecord has two orders (buy and sell, and the actual transactions (trade struct))
@@ -79,12 +88,54 @@ struct amendOrder {
     : order_id(id), act(a), price(p) {}
 };
 
+struct OrderIntrusive {
+    std::int32_t order_id;
+    std::int32_t quantity;
+    std::chrono::system_clock::time_point timestamp;
+    OrderIntrusive* next;
+    OrderIntrusive* prev;
+    OrderIntrusive(const std::int32_t id, const std::int32_t q, const std::chrono::system_clock::time_point t)
+    : order_id(id), quantity(q), timestamp(t), next(nullptr), prev(nullptr) {}
+};
+
+struct OrderList {
+    OrderIntrusive* head;
+    OrderIntrusive* tail;
+
+    OrderList() : head(nullptr), tail(nullptr) {}
+
+    void push_back(OrderIntrusive* order) {
+        order->next = nullptr;
+        order->prev = tail;
+        if (tail) {
+            tail->next = order;
+        } else {
+            head = order;
+        }
+        tail = order;
+    }
+
+    void erase(OrderIntrusive* order) {
+        if (order->prev) {
+            order->prev->next = order->next;
+        } else {
+            head = order->next;
+        }
+        if (order->next) {
+            order->next->prev = order->prev;
+        } else {
+            tail = order->prev;
+        }
+        order->next = nullptr;
+        order->prev = nullptr;
+    }
+
+    bool empty() const { return head == nullptr; }
+};
+
 class orderBook{
     private:
-        virtual Side oppositeSide(const Side side) = 0;
         virtual void updateNextWorstPxIdx(const Side side) = 0;
-        virtual std::int32_t priceToIdx(const double price) = 0;
-        virtual void CheckLookUpMap (std::unordered_map<std::int32_t, OrderLocation> &lookUpMap) = 0;      
     public:
         virtual ~orderBook() = default;
         virtual std::vector<int32_t> addLimitOrder(orderReceived received) = 0;
@@ -97,21 +148,45 @@ class orderBook{
 
 class dequeOrderBook : public orderBook{
     private:
-        std::vector<int32_t> pushOrder (std::shared_ptr<order> received, std::int32_t priceIdx, Side side);
+        std::vector<int32_t> pushOrder (std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side);
         std::vector<int32_t> matchOrder(std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
-        Side oppositeSide(const Side side) override;
         void updateNextWorstPxIdx(const Side side) override;
         std::vector<int32_t> matchAtPriceLevel(std::deque<std::shared_ptr<order>> &level, std::shared_ptr<order> &cleanRec);
-        std::int32_t priceToIdx(const double price) override;
         std::unordered_map<std::int32_t, OrderLocation> lookUpMap;
         std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> bidBook;
         std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> askBook;
         std::int32_t bestBidIdx = -1;
         std::int32_t bestAskIdx = MAXTICKS;
-        void CheckLookUpMap (std::unordered_map<std::int32_t, OrderLocation> &lookUpMap) override;
+        void CheckLookUpMap (std::unordered_map<std::int32_t, OrderLocation> &lookUpMap);
     public:
         //orderBook definition    
         dequeOrderBook();
+        // method for adding a limit order into the order book and match it if necessary
+        std::vector<int32_t> addLimitOrder(orderReceived received) override;
+        std::vector<int32_t> recModOrders(amendOrder modOrder) override;
+        void recCancelOrders(amendOrder modOrder) override;
+        // show the contect of the book
+        void showBook() override;
+        void showLookUpMap() override;
+        // vector that holds the trades
+        std::vector<tradeRecord> trades;
+}; 
+
+class intrusiveOrderBook : public orderBook{
+    private:
+        std::vector<int32_t> pushOrder (OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side);
+        std::vector<int32_t> matchOrder(OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
+        void updateNextWorstPxIdx(const Side side) override;
+        std::vector<int32_t> matchAtPriceLevel(OrderList &level, OrderIntrusive* cleanRec);
+        std::unordered_map<std::int32_t, OrderLocationIntrusive> lookUpMap;
+        std::array<OrderList, MAXTICKS> bidBook;
+        std::array<OrderList, MAXTICKS> askBook;
+        std::int32_t bestBidIdx = -1;
+        std::int32_t bestAskIdx = MAXTICKS;
+        void CheckLookUpMap (std::unordered_map<std::int32_t, OrderLocationIntrusive> &lookUpMap);
+    public:
+        //orderBook definition    
+        intrusiveOrderBook();
         // method for adding a limit order into the order book and match it if necessary
         std::vector<int32_t> addLimitOrder(orderReceived received) override;
         std::vector<int32_t> recModOrders(amendOrder modOrder) override;

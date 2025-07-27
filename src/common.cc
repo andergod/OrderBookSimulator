@@ -37,3 +37,11 @@ Side generateSide() {
     std::bernoulli_distribution dist(0.5);
     return static_cast<Side>(dist(rng));
 }
+
+std::int32_t  priceToIdx(const double price) {
+    return static_cast<std::int32_t>((price - MINPRICE)/TICKSIZE);
+}
+
+Side oppositeSide(const Side side) {
+    return static_cast<Side>(!static_cast<bool>(side));
+}

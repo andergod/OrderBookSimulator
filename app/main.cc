@@ -12,7 +12,12 @@ int main()
     // For loggin all prints
     freopen("log.txt", "w", stdout);
   
-    dequeOrderBook Book;
+    if (BOOKTYPE == type::deque) {
+        dequeOrderBook Book;
+    } else {
+        intrusiveOrderBook Book;
+    }
+
     orderGenerator generator;
 
     // timer initialized     

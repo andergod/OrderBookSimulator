@@ -2,6 +2,7 @@
 #include <iostream>
 #include <map>
 #include "orderBook.h"
+#include "common.cc"
 #include "config.hpp"
 #include <random>
 #include <cmath>
@@ -121,7 +122,6 @@ std::vector<int32_t> dequeOrderBook::matchOrder(std::shared_ptr<order> cleanRec,
     return matchedOrder;
 }
 
-// method for pushing a price into the book in case we don't find any match for it
 std::vector<int32_t> dequeOrderBook::pushOrder(std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side) {
     std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> &desiredBook = (side == Side::Sell) ? askBook : bidBook;
     std::int32_t &bestPxIdx = (side == Side::Sell) ? bestAskIdx : bestBidIdx;
@@ -165,14 +165,6 @@ std::vector<int32_t> dequeOrderBook::matchAtPriceLevel(std::deque<std::shared_pt
         }
     }
     return matchedId;
-}
-
-std::int32_t  dequeOrderBook::priceToIdx(const double price) {
-    return static_cast<std::int32_t>((price - MINPRICE)/TICKSIZE);
-}
-
-Side dequeOrderBook::oppositeSide(const Side side) {
-    return static_cast<Side>(!static_cast<bool>(side));
 }
 
 void dequeOrderBook::showBook() {

@@ -16,3 +16,11 @@ static constexpr double MAXPRICE = 125.0; //prices can't reach this maxPrice. Al
 static constexpr double TICKSIZE = 0.10;
 static constexpr std::int32_t MAXTICKS =static_cast<std::int32_t>((MAXPRICE - MINPRICE) / TICKSIZE);
 static constexpr bool DEBUGMODE = true;
+
+// Define the type of book to deploy
+enum class type:bool {
+    deque = true,
+    intrusive = false
+};
+
+static constexpr type BOOKTYPE = type::intrusive;
