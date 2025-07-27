@@ -17,7 +17,7 @@
 // order Book definition
 intrusiveOrderBook::intrusiveOrderBook() {}
 
-std::vector<int32_t> intrusiveOrderBook::addLimitOrder(orderReceived received) {
+std::vector<int32_t> intrusiveOrderBook::addLimitOrderImpl(orderReceived received) {
     // still is not so clear to me why is a pointer, 
     // usually a pointer is defined as 
     // BookLevel& book = *orderBook[j]; so a bit of a difference
@@ -47,7 +47,7 @@ std::vector<int32_t> intrusiveOrderBook::matchOrder(OrderIntrusive* cleanRec, st
             std::vector<int32_t> atPriceMatched = matchAtPriceLevel(book[px], cleanRec);
             matchedOrder.insert(matchedOrder.end(), atPriceMatched.begin(), atPriceMatched.end());
             if (book[px].empty() && px == bestPxIdx) {
-                updateNextWorstPxIdx(oppositeSide(side));
+                updateNextWorstPxIdxImpl(oppositeSide(side));
             }
         }
     } else {
@@ -56,7 +56,7 @@ std::vector<int32_t> intrusiveOrderBook::matchOrder(OrderIntrusive* cleanRec, st
             std::vector<int32_t> atPriceMatched = matchAtPriceLevel(book[px], cleanRec);
             matchedOrder.insert(matchedOrder.end(), atPriceMatched.begin(), atPriceMatched.end());
             if (book[px].empty() && px == bestPxIdx) {
-                updateNextWorstPxIdx(oppositeSide(side));
+                updateNextWorstPxIdxImpl(oppositeSide(side));
             }
         }
     }
@@ -71,7 +71,7 @@ std::vector<int32_t> intrusiveOrderBook::matchOrder(OrderIntrusive* cleanRec, st
     return matchedOrder;
 }
 
-std::vector<int32_t> intrusiveOrderBook::recModOrders(amendOrder modOrder) {
+std::vector<int32_t> intrusiveOrderBook::modifyOrderImpl(amendOrder modOrder) {
     auto it = lookUpMap.find(modOrder.order_id);
     if (it == lookUpMap.end()) {
         printf("Order Not found, double check code");
@@ -114,7 +114,7 @@ void intrusiveOrderBook::CheckLookUpMap(std::unordered_map<std::int32_t, OrderLo
     }
 }
 
-void intrusiveOrderBook::recCancelOrders(amendOrder canOrder) {
+void intrusiveOrderBook::cancelOrderImpl(amendOrder canOrder) {
     OrderLocationIntrusive loc = lookUpMap[canOrder.order_id];
     std::array<OrderList, MAXTICKS> &book = (loc.side == Side::Sell) ? askBook : bidBook;
     if (DEBUGMODE) printf("On the order Book: We'll cancel order ID %d \n", canOrder.order_id);
@@ -145,7 +145,7 @@ std::vector<int32_t> intrusiveOrderBook::matchAtPriceLevel(OrderList &level, Ord
     return matchedId;
 }
 
-void intrusiveOrderBook::updateNextWorstPxIdx(const Side side) {
+void intrusiveOrderBook::updateNextWorstPxIdxImpl(const Side side) {
     std::int32_t &bestPxIdx = (side == Side::Sell) ? bestBidIdx : bestAskIdx;
     auto& book = (side==Side::Sell) ? bidBook : askBook;
     std::int32_t px = bestPxIdx;

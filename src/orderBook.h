@@ -133,24 +133,49 @@ struct OrderList {
     bool empty() const { return head == nullptr; }
 };
 
-class orderBook{
-    private:
-        virtual void updateNextWorstPxIdx(const Side side) = 0;
-    public:
-        virtual ~orderBook() = default;
-        virtual std::vector<int32_t> addLimitOrder(orderReceived received) = 0;
-        virtual std::vector<int32_t> recModOrders(amendOrder modOrder) = 0;
-        virtual void recCancelOrders(amendOrder modOrder) = 0; 
-        // show the contect of the book
-        virtual void showBook() = 0;
-        virtual void showLookUpMap() = 0;
+template<typename Derived>
+class orderBook {
+private:
+    void updateNextWorstPxIdx(const Side side) {
+        static_cast<Derived*>(this)->updateNextWorstPxIdxImpl(side);
+    }
+public:
+    std::vector<int32_t> addLimitOrder(orderReceived received) {
+        return static_cast<Derived*>(this)->addLimitOrderImpl(received);
+    }
+    std::vector<int32_t> recModOrders(amendOrder modOrder) {
+        return static_cast<Derived*>(this)->modifyOrderImpl(modOrder);
+    }
+    void recCancelOrders(amendOrder modOrder) {
+        static_cast<Derived*>(this)->cancelOrderImpl(modOrder);
+    }
+    void showBook() {
+        static_cast<Derived*>(this)->showBookImpl();
+    }
+    void showLookUpMap() {
+        static_cast<Derived*>(this)->showLookUpMapImpl();
+    }
 };
 
-class dequeOrderBook : public orderBook{
+// class orderBook{
+//     private:
+//         virtual void updateNextWorstPxIdx(const Side side) = 0;
+//     public:
+//         virtual ~orderBook() = default;
+//         virtual std::vector<int32_t> addLimitOrder(orderReceived received) = 0;
+//         virtual std::vector<int32_t> recModOrders(amendOrder modOrder) = 0;
+//         virtual void recCancelOrders(amendOrder modOrder) = 0; 
+//         // show the contect of the book
+//         virtual void showBook() = 0;
+//         virtual void showLookUpMap() = 0;
+// };
+
+class dequeOrderBook : public orderBook<dequeOrderBook>{
     private:
+        friend class orderBook<dequeOrderBook>;
         std::vector<int32_t> pushOrder (std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side);
         std::vector<int32_t> matchOrder(std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
-        void updateNextWorstPxIdx(const Side side) override;
+        void updateNextWorstPxIdxImpl(const Side side);
         std::vector<int32_t> matchAtPriceLevel(std::deque<std::shared_ptr<order>> &level, std::shared_ptr<order> &cleanRec);
         std::unordered_map<std::int32_t, OrderLocation> lookUpMap;
         std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> bidBook;
@@ -162,21 +187,22 @@ class dequeOrderBook : public orderBook{
         //orderBook definition    
         dequeOrderBook();
         // method for adding a limit order into the order book and match it if necessary
-        std::vector<int32_t> addLimitOrder(orderReceived received) override;
-        std::vector<int32_t> recModOrders(amendOrder modOrder) override;
-        void recCancelOrders(amendOrder modOrder) override;
+        std::vector<int32_t> addLimitOrderImpl(orderReceived received);
+        std::vector<int32_t> modifyOrderImpl(amendOrder modOrder);
+        void cancelOrderImpl(amendOrder modOrder);
         // show the contect of the book
-        void showBook() override;
-        void showLookUpMap() override;
+        void showBookImpl();
+        void showLookUpMapImpl();
         // vector that holds the trades
         std::vector<tradeRecord> trades;
 }; 
 
-class intrusiveOrderBook : public orderBook{
+class intrusiveOrderBook : public orderBook<intrusiveOrderBook>{
     private:
+        friend class orderBook<intrusiveOrderBook>;
         std::vector<int32_t> pushOrder (OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side);
         std::vector<int32_t> matchOrder(OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
-        void updateNextWorstPxIdx(const Side side) override;
+        void updateNextWorstPxIdxImpl(const Side side);
         std::vector<int32_t> matchAtPriceLevel(OrderList &level, OrderIntrusive* cleanRec);
         std::unordered_map<std::int32_t, OrderLocationIntrusive> lookUpMap;
         std::array<OrderList, MAXTICKS> bidBook;
@@ -188,12 +214,12 @@ class intrusiveOrderBook : public orderBook{
         //orderBook definition    
         intrusiveOrderBook();
         // method for adding a limit order into the order book and match it if necessary
-        std::vector<int32_t> addLimitOrder(orderReceived received) override;
-        std::vector<int32_t> recModOrders(amendOrder modOrder) override;
-        void recCancelOrders(amendOrder modOrder) override;
+        std::vector<int32_t> addLimitOrderImpl(orderReceived received);
+        std::vector<int32_t> modifyOrderImpl(amendOrder modOrder);
+        void cancelOrderImpl(amendOrder modOrder);
         // show the contect of the book
-        void showBook() override;
-        void showLookUpMap() override;
+        void showBookImpl();
+        void showLookUpMapImpl();
         // vector that holds the trades
         std::vector<tradeRecord> trades;
 }; 

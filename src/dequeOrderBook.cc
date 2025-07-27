@@ -17,7 +17,7 @@
 // order Book definition
 dequeOrderBook::dequeOrderBook() {}
 
-std::vector<int32_t> dequeOrderBook::addLimitOrder(orderReceived received) {
+std::vector<int32_t> dequeOrderBook::addLimitOrderImpl(orderReceived received) {
     std::shared_ptr<order> cleanRecPt = std::make_shared<order>(received.order_id, received.quantity, std::chrono::system_clock::now());
     std::int32_t priceIdx = priceToIdx(received.price);
     std::int32_t bestPxIdx = (received.side == Side::Sell) ? bestBidIdx : bestAskIdx;
@@ -33,7 +33,7 @@ std::vector<int32_t> dequeOrderBook::addLimitOrder(orderReceived received) {
     return (condition) ? matchOrder(cleanRecPt, priceIdx, received.side, bestPxIdx) : pushOrder(cleanRecPt, priceIdx, received.side);
 }
 
-std::vector<int32_t> dequeOrderBook::recModOrders(amendOrder modOrder) {
+std::vector<int32_t> dequeOrderBook::modifyOrderImpl(amendOrder modOrder) {
     auto it = lookUpMap.find(modOrder.order_id);
     if (it == lookUpMap.end()) {
         printf("Order Not found, double check code");
@@ -77,7 +77,7 @@ void dequeOrderBook::CheckLookUpMap(std::unordered_map<std::int32_t, OrderLocati
     }
 }
 
-void dequeOrderBook::recCancelOrders(amendOrder canOrder) {
+void dequeOrderBook::cancelOrderImpl(amendOrder canOrder) {
     OrderLocation loc = lookUpMap[canOrder.order_id];
     std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> &book = (loc.side == Side::Sell) ? askBook : bidBook;
     if (DEBUGMODE) printf("On the order Book: We'll cancel order ID %d \n", canOrder.order_id);
@@ -98,7 +98,7 @@ std::vector<int32_t> dequeOrderBook::matchOrder(std::shared_ptr<order> cleanRec,
             std::vector<int32_t> atPriceMatched = matchAtPriceLevel(book[px], cleanRec);
             matchedOrder.insert(matchedOrder.end(), atPriceMatched.begin(), atPriceMatched.end());
             if (book[px].empty() && px == bestPxIdx) {
-                updateNextWorstPxIdx(oppositeSide(side));
+                updateNextWorstPxIdxImpl(oppositeSide(side));
             }
         }
     } else {
@@ -107,7 +107,7 @@ std::vector<int32_t> dequeOrderBook::matchOrder(std::shared_ptr<order> cleanRec,
             std::vector<int32_t> atPriceMatched = matchAtPriceLevel(book[px], cleanRec);
             matchedOrder.insert(matchedOrder.end(), atPriceMatched.begin(), atPriceMatched.end());
             if (book[px].empty() && px == bestPxIdx) {
-                updateNextWorstPxIdx(oppositeSide(side));
+                updateNextWorstPxIdxImpl(oppositeSide(side));
             }
         }
     }
@@ -136,7 +136,7 @@ std::vector<int32_t> dequeOrderBook::pushOrder(std::shared_ptr<order> cleanRec, 
     return {};
 }
 
-void dequeOrderBook::updateNextWorstPxIdx(const Side side) {
+void dequeOrderBook::updateNextWorstPxIdxImpl(const Side side) {
     std::int32_t &bestPxIdx = (side == Side::Sell) ? bestBidIdx : bestAskIdx;
     auto& book = (side==Side::Sell) ? bidBook : askBook;
     std::int32_t px = bestPxIdx;
@@ -167,7 +167,7 @@ std::vector<int32_t> dequeOrderBook::matchAtPriceLevel(std::deque<std::shared_pt
     return matchedId;
 }
 
-void dequeOrderBook::showBook() {
+void dequeOrderBook::showBookImpl() {
     // iterate over each price of the order book
     using BookLevel = std::array<std::deque<std::shared_ptr<order>>, MAXTICKS>;
     // Because i am making a array of references, I can't put them in a container
@@ -203,7 +203,7 @@ void dequeOrderBook::showBook() {
     std::cout << "Best Bid: " << (bestBidIdx*TICKSIZE) + MINPRICE << std::endl;
 }
 
-void dequeOrderBook::showLookUpMap () {
+void dequeOrderBook::showLookUpMapImpl () {
     int count = 0;
     for (const auto& entry : lookUpMap) {
         std::cout << "Order ID: " << entry.first << std::endl;
