@@ -21,7 +21,7 @@ std::vector<int32_t> intrusiveOrderBook::addLimitOrderImpl(orderReceived receive
     // still is not so clear to me why is a pointer, 
     // usually a pointer is defined as 
     // BookLevel& book = *orderBook[j]; so a bit of a difference
-    OrderIntrusive* cleanRecPt = new OrderIntrusive(received.order_id, received.quantity, std::chrono::system_clock::now());
+    OrderIntrusive* cleanRecPt = orderPool.allocate(received.order_id, received.quantity, std::chrono::system_clock::now());
     std::int32_t priceIdx = priceToIdx(received.price);
     std::int32_t bestPxIdx = (received.side == Side::Sell) ? bestBidIdx : bestAskIdx;
     // If sell then make it priceIdx <= bestPxIdex
@@ -67,6 +67,7 @@ std::vector<int32_t> intrusiveOrderBook::matchOrder(OrderIntrusive* cleanRec, st
         if (DEBUGMODE) printf("Filled at origin %d \n", cleanRec->order_id);
         // Add to the vector of cancel orders if the quantity is zero
         matchedOrder.push_back(cleanRec->order_id);
+        orderPool.deallocate(cleanRec);
     }
     return matchedOrder;
 }
@@ -120,6 +121,7 @@ void intrusiveOrderBook::cancelOrderImpl(amendOrder canOrder) {
     if (DEBUGMODE) printf("On the order Book: We'll cancel order ID %d \n", canOrder.order_id);
     // Erase the original order from the deque and delete for LookupMap
     auto& dq = book[loc.price_index];
+    orderPool.deallocate(loc.price_index);
     dq.erase(loc.order_pt);
     lookUpMap.erase(canOrder.order_id);
 }
@@ -140,6 +142,7 @@ std::vector<int32_t> intrusiveOrderBook::matchAtPriceLevel(OrderList &level, Ord
             lookUpMap.erase(matchingOrder->order_id);
             // Delete the matched order with q = 0 from the level
             level.erase(matchingOrder);
+            orderPool.deallocate(matchingOrder);
         }
     }
     return matchedId;

@@ -45,3 +45,33 @@ std::int32_t  priceToIdx(const double price) {
 Side oppositeSide(const Side side) {
     return static_cast<Side>(!static_cast<bool>(side));
 }
+
+
+class OrderPool {
+private:
+    std::vector<OrderIntrusive> pool;
+    std::vector<OrderIntrusive*> freeList;
+
+public:
+    OrderPool(size_t size) {
+        pool.resize(size);
+        for (auto& order : pool) {
+            freeList.push_back(&order);
+        }
+    }
+
+    OrderIntrusive* allocate(std::int32_t id, std::int32_t quantity, std::chrono::system_clock::time_point timestamp) {
+        if (freeList.empty()) {
+            throw std::bad_alloc();
+        }
+        OrderIntrusive* order = freeList.back();
+        freeList.pop_back();
+        // another case where we create a pointer but not sure why or wher? 
+        *order = OrderIntrusive(id, quantity, timestamp);
+        return order;
+    }
+
+    void deallocate(OrderIntrusive* order) {
+        freeList.push_back(order);
+    }
+};

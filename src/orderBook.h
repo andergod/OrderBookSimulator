@@ -133,6 +133,16 @@ struct OrderList {
     bool empty() const { return head == nullptr; }
 };
 
+class orderPool {
+    private:
+        std::vector<OrderIntrusive> pool;
+        std::vector<OrderIntrusive> freeList;
+    public:
+        orderPool(std::int32_t size);
+        OrderIntrusive* allocate(std::int32_t id, std::int32_t price, std::int32_t quantity, Side side);
+        void deallocate(OrderIntrusive* order);
+};
+
 template<typename Derived>
 class orderBook {
 private:
@@ -200,6 +210,7 @@ class dequeOrderBook : public orderBook<dequeOrderBook>{
 class intrusiveOrderBook : public orderBook<intrusiveOrderBook>{
     private:
         friend class orderBook<intrusiveOrderBook>;
+        OrderPool orderPool;
         std::vector<int32_t> pushOrder (OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side);
         std::vector<int32_t> matchOrder(OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
         void updateNextWorstPxIdxImpl(const Side side);
@@ -212,7 +223,7 @@ class intrusiveOrderBook : public orderBook<intrusiveOrderBook>{
         void CheckLookUpMap (std::unordered_map<std::int32_t, OrderLocationIntrusive> &lookUpMap);
     public:
         //orderBook definition    
-        intrusiveOrderBook();
+        intrusiveOrderBook() : orderPool(MAXTICKS) {};
         // method for adding a limit order into the order book and match it if necessary
         std::vector<int32_t> addLimitOrderImpl(orderReceived received);
         std::vector<int32_t> modifyOrderImpl(amendOrder modOrder);

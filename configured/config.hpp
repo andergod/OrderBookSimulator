@@ -23,4 +23,4 @@ enum class type:bool {
     intrusive = false
 };
 
-static constexpr type BOOKTYPE = type::deque;
+static constexpr type BOOKTYPE = type::intrusive;
