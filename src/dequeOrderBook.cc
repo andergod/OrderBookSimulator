@@ -26,7 +26,7 @@ std::vector<int32_t> dequeOrderBook::addLimitOrderImpl(orderReceived received) {
     if (DEBUGMODE) {
         printf("Adding limit order for Id %d \n", cleanRecPt->order_id);
         printf("Index Location: %d; ", priceIdx);
-        printf("Side: %d; ", received.side);
+        printf("Side: %s; ", received.side== Side::Sell ? "Sell" : "Buy");
         printf("Quantity: %d \n", cleanRecPt->quantity);
         fflush(stdout);
     }
@@ -43,7 +43,6 @@ std::vector<int32_t> dequeOrderBook::modifyOrderImpl(amendOrder modOrder) {
         std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> &book = (loc.side == Side::Sell) ? askBook : bidBook;
         // I will bet this will break something, as I am adding it to a deque, where needs to be copied
         order oldOrder = *loc.order_pt;
-        
         orderReceived newOrder = orderReceived(modOrder.price.value(), oldOrder.quantity, loc.side, std::chrono::system_clock::now(), oldOrder.order_id);
         if (DEBUGMODE) {
             printf("Order ID to Modify: %d \n", modOrder.order_id);

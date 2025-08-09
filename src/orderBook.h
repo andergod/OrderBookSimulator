@@ -58,6 +58,17 @@ struct OrderLocation {
     : side(s), price_index(pxIdx), order_pt(it) {}
 };
 
+struct OrderIntrusive {
+    std::int32_t order_id;
+    std::int32_t quantity;
+    std::chrono::system_clock::time_point timestamp;
+    OrderIntrusive* next;
+    OrderIntrusive* prev;
+    OrderIntrusive() = default;
+    OrderIntrusive(const std::int32_t id, const std::int32_t q, const std::chrono::system_clock::time_point t)
+    : order_id(id), quantity(q), timestamp(t), next(nullptr), prev(nullptr) {}
+};
+
 struct OrderLocationIntrusive {
     Side side;                   
     std::int32_t price_index;      
@@ -86,16 +97,6 @@ struct amendOrder {
     std::optional<double> price;
     amendOrder(std::int32_t id, action a, std::optional<double> p = std::nullopt)
     : order_id(id), act(a), price(p) {}
-};
-
-struct OrderIntrusive {
-    std::int32_t order_id;
-    std::int32_t quantity;
-    std::chrono::system_clock::time_point timestamp;
-    OrderIntrusive* next;
-    OrderIntrusive* prev;
-    OrderIntrusive(const std::int32_t id, const std::int32_t q, const std::chrono::system_clock::time_point t)
-    : order_id(id), quantity(q), timestamp(t), next(nullptr), prev(nullptr) {}
 };
 
 struct OrderList {
@@ -133,13 +134,13 @@ struct OrderList {
     bool empty() const { return head == nullptr; }
 };
 
-class orderPool {
+class OrderPool {
     private:
         std::vector<OrderIntrusive> pool;
-        std::vector<OrderIntrusive> freeList;
+        std::vector<OrderIntrusive*> freeList;
     public:
-        orderPool(std::int32_t size);
-        OrderIntrusive* allocate(std::int32_t id, std::int32_t price, std::int32_t quantity, Side side);
+        OrderPool(std::int32_t size);
+        OrderIntrusive* allocate(std::int32_t id, std::int32_t quantity, std::chrono::system_clock::time_point timestamp);
         void deallocate(OrderIntrusive* order);
 };
 
@@ -209,6 +210,8 @@ class dequeOrderBook : public orderBook<dequeOrderBook>{
 
 class intrusiveOrderBook : public orderBook<intrusiveOrderBook>{
     private:
+        // worth making it friends or should i manage and do everything need it public, make UpdateNextImpl public
+        // and should I make on the interphace prive but the implementation private
         friend class orderBook<intrusiveOrderBook>;
         OrderPool orderPool;
         std::vector<int32_t> pushOrder (OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side);
@@ -223,7 +226,7 @@ class intrusiveOrderBook : public orderBook<intrusiveOrderBook>{
         void CheckLookUpMap (std::unordered_map<std::int32_t, OrderLocationIntrusive> &lookUpMap);
     public:
         //orderBook definition    
-        intrusiveOrderBook() : orderPool(MAXTICKS) {};
+        intrusiveOrderBook() : orderPool(1000*MAXTICKS) {};
         // method for adding a limit order into the order book and match it if necessary
         std::vector<int32_t> addLimitOrderImpl(orderReceived received);
         std::vector<int32_t> modifyOrderImpl(amendOrder modOrder);

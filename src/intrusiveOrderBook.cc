@@ -2,8 +2,8 @@
 #include <iostream>
 #include <map>
 #include "orderBook.h"
-#include "common.cc"
 #include "config.hpp"
+#include "common.h"
 #include <random>
 #include <cmath>
 #include <vector>
@@ -15,8 +15,6 @@
 #include <algorithm>
 
 // order Book definition
-intrusiveOrderBook::intrusiveOrderBook() {}
-
 std::vector<int32_t> intrusiveOrderBook::addLimitOrderImpl(orderReceived received) {
     // still is not so clear to me why is a pointer, 
     // usually a pointer is defined as 
@@ -29,7 +27,7 @@ std::vector<int32_t> intrusiveOrderBook::addLimitOrderImpl(orderReceived receive
     if (DEBUGMODE) {
         printf("Adding limit order for Id %d \n", cleanRecPt->order_id);
         printf("Index Location: %d; ", priceIdx);
-        printf("Side: %d; ", received.side);
+        printf("Side: %s; ", received.side== Side::Sell ? "Sell" : "Buy");
         printf("Quantity: %d \n", cleanRecPt->quantity);
         fflush(stdout);
     }
@@ -121,7 +119,7 @@ void intrusiveOrderBook::cancelOrderImpl(amendOrder canOrder) {
     if (DEBUGMODE) printf("On the order Book: We'll cancel order ID %d \n", canOrder.order_id);
     // Erase the original order from the deque and delete for LookupMap
     auto& dq = book[loc.price_index];
-    orderPool.deallocate(loc.price_index);
+    orderPool.deallocate(loc.order_pt);
     dq.erase(loc.order_pt);
     lookUpMap.erase(canOrder.order_id);
 }
@@ -172,3 +170,48 @@ std::vector<int32_t> intrusiveOrderBook::pushOrder(OrderIntrusive* cleanRec, std
     return {};
 }
 
+void intrusiveOrderBook::showBookImpl() {
+    // iterate over each price of the order book
+    using BookLevel = std::array<OrderList, MAXTICKS>;
+    // So, when references aren't enough, I use pointers which difficult the verbosity but are more flexibles
+    std::array<BookLevel*, 2> orderBook = {&askBook, &bidBook};
+    std::array<std::string_view, 2> bookName = {"Ask Book: ", "Bid Book"};
+    for (std::int32_t j=0; j<orderBook.size(); ++j) {
+        std::cout << bookName[j] << std::endl;
+        BookLevel& book = *orderBook[j];
+        for (std::int32_t i=0; i<book.size(); ++i) {
+            double price = (i*TICKSIZE) + MINPRICE;
+            const OrderList &ordersAtPrice= book[i]; // The vector of orders at this price
+            if (ordersAtPrice.empty()) {
+                continue;
+            }
+            // Print the price level
+            std::cout << "Price: " << price << std::endl;
+            // iterate over each side (buy and sell) in a determined price
+            OrderIntrusive* curr = ordersAtPrice.head;
+            while (curr) {
+                std::time_t orderTime = std::chrono::system_clock::to_time_t(curr->timestamp);
+                std::tm tm_order = *std::localtime(&orderTime);
+
+                // show the relevant values
+                std::cout << "  Order ID: " << curr->order_id
+                        << ", Quantity: " << curr->quantity
+                        << ", timestamp: " << std::put_time(&tm_order, "%Y-%m-%d %H:%M:%S")  << std::endl;
+            }
+        }   
+    }
+    std::cout << "Best Ask: " << (bestAskIdx*TICKSIZE) + MINPRICE << std::endl;
+    std::cout << "Best Bid: " << (bestBidIdx*TICKSIZE) + MINPRICE << std::endl;
+}
+
+void intrusiveOrderBook::showLookUpMapImpl () {
+    int count = 0;
+    for (const auto& entry : lookUpMap) {
+        std::cout << "Order ID: " << entry.first << std::endl;
+        std::cout << "Side: (Is Sell?) " << static_cast<bool>(entry.second.side) << std::endl;
+        std::cout << "Price Index: " << (entry.second.price_index * TICKSIZE) + MINPRICE << std::endl;
+        std::cout << "--------------------------" << std::endl;
+
+        if (++count >= 10) break;  // stop after 10 entries
+    }
+}

@@ -11,12 +11,7 @@ int main()
     std::cout << project_version << '\n';
     // For loggin all prints
     freopen("log.txt", "w", stdout);
-  
-    if (BOOKTYPE == type::deque) {
-        dequeOrderBook Book;
-    } else {
-        intrusiveOrderBook Book;
-    }
+    std::conditional_t<BOOKTYPE == type::deque, dequeOrderBook, intrusiveOrderBook> Book;
 
     orderGenerator generator;
 
@@ -25,11 +20,6 @@ int main()
     std::int32_t count = 1;
     
     while (true) {
-        // create an order to add to the book
-        // std::vector<std::int32_t> cancelOrders = Book.addLimitOrder(generator.generateOrder());
-        // for (auto&cancelIds : cancelOrders) {
-        //         generator.ackCancel(cancelIds);f
-        // }
         if (count%7==0) {
             std::vector<std::int32_t> cancelOrders = Book.recModOrders(generator.modifyOrders());
             for (auto&cancelIds : cancelOrders) {
@@ -59,7 +49,7 @@ int main()
     
     // Show results
     Book.showBook();
-    Book.showLookUpMap();
+    // Book.showLookUpMap();
     generator.showActiveId();
 
     return 0;

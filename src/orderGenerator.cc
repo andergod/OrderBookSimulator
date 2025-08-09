@@ -2,8 +2,8 @@
 #include <iostream>
 #include <map>
 #include "orderBook.h"
+#include "common.h"
 #include "config.hpp"
-#include "common.cc"
 #include <random>
 #include <cmath>
 #include <vector>
