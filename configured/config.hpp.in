@@ -18,9 +18,10 @@ static constexpr std::int32_t MAXTICKS =static_cast<std::int32_t>((MAXPRICE - MI
 static constexpr bool DEBUGMODE = true;
 
 // Define the type of book to deploy
-enum class type:bool {
-    deque = true,
-    intrusive = false
+enum class type:int {
+    deque,
+    intrusive,
+    pmr
 };
 
-static constexpr type BOOKTYPE = type::deque;
+static constexpr type BOOKTYPE = type::pmr;

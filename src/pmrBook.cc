@@ -13,9 +13,12 @@
 #include <array>
 #include <memory>  
 #include <algorithm>
+#include <memory_resource>
+
+pmrBook::pmrBook() : orderPool(makeOrderPool(1000 * MAXTICKS)) {}
 
 // order Book definition
-std::vector<int32_t> intrusiveOrderBook::addLimitOrderImpl(orderReceived received) {
+std::vector<int32_t> pmrBook::addLimitOrderImpl(orderReceived received) {
     // still is not so clear to me why is a pointer, 
     // usually a pointer is defined as 
     // BookLevel& book = *orderBook[j]; so a bit of a difference
@@ -35,7 +38,7 @@ std::vector<int32_t> intrusiveOrderBook::addLimitOrderImpl(orderReceived receive
 }
 
 
-std::vector<int32_t> intrusiveOrderBook::matchOrder(OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx) {
+std::vector<int32_t> pmrBook::matchOrder(OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx) {
     // active orders
     std::array<OrderList, MAXTICKS> &book = (side == Side::Sell) ? bidBook : askBook;
     std::vector<int32_t> matchedOrder;
@@ -70,7 +73,7 @@ std::vector<int32_t> intrusiveOrderBook::matchOrder(OrderIntrusive* cleanRec, st
     return matchedOrder;
 }
 
-std::vector<int32_t> intrusiveOrderBook::modifyOrderImpl(amendOrder modOrder) {
+std::vector<int32_t> pmrBook::modifyOrderImpl(amendOrder modOrder) {
     auto it = lookUpMap.find(modOrder.order_id);
     if (it == lookUpMap.end()) {
         printf("Order Not found, double check code");
@@ -101,7 +104,7 @@ std::vector<int32_t> intrusiveOrderBook::modifyOrderImpl(amendOrder modOrder) {
     }
 }
 
-void intrusiveOrderBook::CheckLookUpMap(std::unordered_map<std::int32_t, OrderLocationIntrusive> &lookUpMap) {
+void pmrBook::CheckLookUpMap(std::unordered_map<std::int32_t, OrderLocationIntrusive> &lookUpMap) {
     for (auto &pair: lookUpMap) {
         int32_t key = pair.first;
         OrderLocationIntrusive &loc = pair.second;
@@ -113,7 +116,7 @@ void intrusiveOrderBook::CheckLookUpMap(std::unordered_map<std::int32_t, OrderLo
     }
 }
 
-void intrusiveOrderBook::cancelOrderImpl(amendOrder canOrder) {
+void pmrBook::cancelOrderImpl(amendOrder canOrder) {
     OrderLocationIntrusive loc = lookUpMap[canOrder.order_id];
     std::array<OrderList, MAXTICKS> &book = (loc.side == Side::Sell) ? askBook : bidBook;
     if (DEBUGMODE) printf("On the order Book: We'll cancel order ID %d \n", canOrder.order_id);
@@ -124,7 +127,7 @@ void intrusiveOrderBook::cancelOrderImpl(amendOrder canOrder) {
     lookUpMap.erase(canOrder.order_id);
 }
 
-std::vector<int32_t> intrusiveOrderBook::matchAtPriceLevel(OrderList &level, OrderIntrusive* cleanRec) {
+std::vector<int32_t> pmrBook::matchAtPriceLevel(OrderList &level, OrderIntrusive* cleanRec) {
     std::vector<int32_t> matchedId;
     while (!level.empty() && cleanRec->quantity > 0) {
         OrderIntrusive* matchingOrder = level.head;
@@ -146,7 +149,7 @@ std::vector<int32_t> intrusiveOrderBook::matchAtPriceLevel(OrderList &level, Ord
     return matchedId;
 }
 
-void intrusiveOrderBook::updateNextWorstPxIdxImpl(const Side side) {
+void pmrBook::updateNextWorstPxIdxImpl(const Side side) {
     std::int32_t &bestPxIdx = (side == Side::Sell) ? bestBidIdx : bestAskIdx;
     auto& book = (side==Side::Sell) ? bidBook : askBook;
     std::int32_t px = bestPxIdx;
@@ -156,7 +159,7 @@ void intrusiveOrderBook::updateNextWorstPxIdxImpl(const Side side) {
     bestPxIdx = px;
 }
 
-std::vector<int32_t> intrusiveOrderBook::pushOrder(OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side) {
+std::vector<int32_t> pmrBook::pushOrder(OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side) {
     std::array<OrderList, MAXTICKS> &desiredBook = (side == Side::Sell) ? askBook : bidBook;
     std::int32_t &bestPxIdx = (side == Side::Sell) ? bestAskIdx : bestBidIdx;
     // updating bestAsk/bestBid in case new order is better and not matching
@@ -170,7 +173,7 @@ std::vector<int32_t> intrusiveOrderBook::pushOrder(OrderIntrusive* cleanRec, std
     return {};
 }
 
-void intrusiveOrderBook::showBookImpl() {
+void pmrBook::showBookImpl() {
     // iterate over each price of the order book
     using BookLevel = std::array<OrderList, MAXTICKS>;
     // So, when references aren't enough, I use pointers which difficult the verbosity but are more flexibles
@@ -205,7 +208,7 @@ void intrusiveOrderBook::showBookImpl() {
     std::cout << "Best Bid: " << (bestBidIdx*TICKSIZE) + MINPRICE << std::endl;
 }
 
-void intrusiveOrderBook::showLookUpMapImpl () {
+void pmrBook::showLookUpMapImpl () {
     int count = 0;
     for (const auto& entry : lookUpMap) {
         std::cout << "Order ID: " << entry.first << std::endl;
@@ -215,4 +218,14 @@ void intrusiveOrderBook::showLookUpMapImpl () {
 
         if (++count >= 10) break;  // stop after 10 entries
     }
+}
+
+pmrPool pmrBook::makeOrderPool(size_t capacity) {
+    static std::array<std::byte, 1000 * MAXTICKS * sizeof(OrderIntrusive)> buf;
+    static std::pmr::monotonic_buffer_resource fallback{
+        buf.data(), buf.size(), std::pmr::new_delete_resource()
+    };
+    static std::pmr::unsynchronized_pool_resource pool{&fallback};
+
+    return pmrPool(capacity, pool);
 }

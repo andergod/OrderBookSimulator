@@ -60,6 +60,7 @@ OrderIntrusive* OrderPool::allocate(std::int32_t id, std::int32_t quantity, std:
     OrderIntrusive* order = freeList.back();
     freeList.pop_back();
     // another case where we create a pointer but not sure why or where? 
+    // is this line responsable of having the element always around and not deleting afterwards
     *order = OrderIntrusive(id, quantity, timestamp);
     return order;
 }

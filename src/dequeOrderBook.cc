@@ -33,6 +33,14 @@ std::vector<int32_t> dequeOrderBook::addLimitOrderImpl(orderReceived received) {
     return (condition) ? matchOrder(cleanRecPt, priceIdx, received.side, bestPxIdx) : pushOrder(cleanRecPt, priceIdx, received.side);
 }
 
+// // class orderBookWithLogs::{
+//             base dequeOrderBook;
+// //     private:
+// //         virtual void addLimitOrderImpl(const Side side)override;
+
+//                 print("I am doing addLimitOrderImpl")
+
+
 std::vector<int32_t> dequeOrderBook::modifyOrderImpl(amendOrder modOrder) {
     auto it = lookUpMap.find(modOrder.order_id);
     if (it == lookUpMap.end()) {

@@ -11,8 +11,10 @@ int main()
     std::cout << project_version << '\n';
     // For loggin all prints
     freopen("log.txt", "w", stdout);
-    std::conditional_t<BOOKTYPE == type::deque, dequeOrderBook, intrusiveOrderBook> Book;
-
+    // add another conditional here
+    using BookType = std::conditional_t<BOOKTYPE == type::deque, dequeOrderBook, 
+        std::conditional_t<BOOKTYPE== type::pmr, pmrBook, intrusiveOrderBook>>;
+    BookType Book;
     orderGenerator generator;
 
     // timer initialized     

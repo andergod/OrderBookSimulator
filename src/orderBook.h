@@ -8,8 +8,10 @@
 #include <deque>
 #include <unordered_map>
 #include "config.hpp"
+#include <memory_resource>
 #include <optional>
 #include <memory>  
+
 
 enum class Side:bool {
     Buy = false,
@@ -134,7 +136,7 @@ struct OrderList {
     bool empty() const { return head == nullptr; }
 };
 
-class OrderPool {
+class OrderPool { 
     private:
         std::vector<OrderIntrusive> pool;
         std::vector<OrderIntrusive*> freeList;
@@ -142,6 +144,18 @@ class OrderPool {
         OrderPool(std::int32_t size);
         OrderIntrusive* allocate(std::int32_t id, std::int32_t quantity, std::chrono::system_clock::time_point timestamp);
         void deallocate(OrderIntrusive* order);
+};
+
+class pmrPool {
+    std::pmr::unsynchronized_pool_resource& pool;
+    std::pmr::vector<OrderIntrusive*> free_list;
+    size_t capacity;
+
+public:
+    pmrPool(size_t cap, std::pmr::unsynchronized_pool_resource& p);
+    OrderIntrusive* allocate(std::int32_t id, std::int32_t quantity, std::chrono::system_clock::time_point timestamp);
+    void deallocate(OrderIntrusive* order);
+        
 };
 
 template<typename Derived>
@@ -227,6 +241,37 @@ class intrusiveOrderBook : public orderBook<intrusiveOrderBook>{
     public:
         //orderBook definition    
         intrusiveOrderBook() : orderPool(1000*MAXTICKS) {};
+        // method for adding a limit order into the order book and match it if necessary
+        std::vector<int32_t> addLimitOrderImpl(orderReceived received);
+        std::vector<int32_t> modifyOrderImpl(amendOrder modOrder);
+        void cancelOrderImpl(amendOrder modOrder);
+        // show the contect of the book
+        void showBookImpl();
+        void showLookUpMapImpl();
+        // vector that holds the trades
+        std::vector<tradeRecord> trades;
+}; 
+
+class pmrBook : public orderBook<pmrBook>{
+    private:
+        // worth making it friends or should i manage and do everything need it public, make UpdateNextImpl public
+        // and should I make on the interphace prive but the implementation private
+        friend class orderBook<pmrBook>;
+        std::vector<int32_t> pushOrder (OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side);
+        std::vector<int32_t> matchOrder(OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
+        void updateNextWorstPxIdxImpl(const Side side);
+        std::vector<int32_t> matchAtPriceLevel(OrderList &level, OrderIntrusive* cleanRec);
+        std::unordered_map<std::int32_t, OrderLocationIntrusive> lookUpMap;
+        pmrPool makeOrderPool(size_t capacity);
+        std::array<OrderList, MAXTICKS> bidBook;
+        std::array<OrderList, MAXTICKS> askBook;
+        std::int32_t bestBidIdx = -1;
+        std::int32_t bestAskIdx = MAXTICKS;
+        pmrPool orderPool;
+        void CheckLookUpMap (std::unordered_map<std::int32_t, OrderLocationIntrusive> &lookUpMap);
+    public:
+        //orderBook definition    
+        pmrBook();
         // method for adding a limit order into the order book and match it if necessary
         std::vector<int32_t> addLimitOrderImpl(orderReceived received);
         std::vector<int32_t> modifyOrderImpl(amendOrder modOrder);

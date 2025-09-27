@@ -8,8 +8,8 @@ set(CMAKE_CXX_EXTENSIONS        OFF)
 
 option(ENABLE_WARNINGS "Enable compiler warnings for a target" ON)
 
-option(ENABLE_SANITIZE_ADDR "Enable address sanitizer" ON)
-option(ENABLE_SANITIZE_UNDEF "Enable undefined sanitizer" ON)
+option(ENABLE_SANITIZE_ADDR "Enable address sanitizer" OFF)
+option(ENABLE_SANITIZE_UNDEF "Enable undefined sanitizer" OFF)
 
 set(LIBRARY_NAME Library)
 set(EXECUTABLE_NAME Executable)
