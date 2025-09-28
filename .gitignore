@@ -5,3 +5,6 @@
 .vscode/
 log.txt
 build_output.txt
+.env
+data/alpaca_sample.json
+data/websocket.log
