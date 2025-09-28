@@ -160,11 +160,10 @@ public:
 
 template<typename Derived>
 class orderBook {
-private:
+public:
     void updateNextWorstPxIdx(const Side side) {
         static_cast<Derived*>(this)->updateNextWorstPxIdxImpl(side);
     }
-public:
     std::vector<int32_t> addLimitOrder(orderReceived received) {
         return static_cast<Derived*>(this)->addLimitOrderImpl(received);
     }
@@ -197,11 +196,10 @@ public:
 
 class dequeOrderBook : public orderBook<dequeOrderBook>{
     private:
-        friend class orderBook<dequeOrderBook>;
         std::vector<int32_t> pushOrder (std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side);
         std::vector<int32_t> matchOrder(std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
-        void updateNextWorstPxIdxImpl(const Side side);
         std::vector<int32_t> matchAtPriceLevel(std::deque<std::shared_ptr<order>> &level, std::shared_ptr<order> &cleanRec);
+        void updateNextWorstPxIdxImpl(const Side side);
         std::unordered_map<std::int32_t, OrderLocation> lookUpMap;
         std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> bidBook;
         std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> askBook;

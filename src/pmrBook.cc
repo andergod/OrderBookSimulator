@@ -19,9 +19,6 @@ pmrBook::pmrBook() : orderPool(makeOrderPool(1000 * MAXTICKS)) {}
 
 // order Book definition
 std::vector<int32_t> pmrBook::addLimitOrderImpl(orderReceived received) {
-    // still is not so clear to me why is a pointer, 
-    // usually a pointer is defined as 
-    // BookLevel& book = *orderBook[j]; so a bit of a difference
     OrderIntrusive* cleanRecPt = orderPool.allocate(received.order_id, received.quantity, std::chrono::system_clock::now());
     std::int32_t priceIdx = priceToIdx(received.price);
     std::int32_t bestPxIdx = (received.side == Side::Sell) ? bestBidIdx : bestAskIdx;

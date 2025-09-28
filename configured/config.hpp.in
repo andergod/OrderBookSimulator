@@ -24,4 +24,4 @@ enum class type:int {
     pmr
 };
 
-static constexpr type BOOKTYPE = type::pmr;
+static constexpr type BOOKTYPE = type::deque;
