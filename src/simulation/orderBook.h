@@ -179,27 +179,24 @@ public:
     void showLookUpMap() {
         static_cast<Derived*>(this)->showLookUpMapImpl();
     }
+protected:
+     void updateNextWorstPxIdDef(const Side side) {
+        std::int32_t &bestPxIdx = (side == Side::Sell) ?  static_cast<Derived*>(this)->bestBidIdx : static_cast<Derived*>(this)->bestAskIdx;
+        auto& book = (side==Side::Sell) ? static_cast<Derived*>(this)->bidBook : static_cast<Derived*>(this)->askBook;
+        std::int32_t px = bestPxIdx;
+        while (px >= 0 && px < MAXTICKS && book[px].empty()) {
+            px += (side==Side::Sell ? -1 : 1);
+        }
+        bestPxIdx = px;
+    }
 };
-
-// class orderBook{
-//     private:
-//         virtual void updateNextWorstPxIdx(const Side side) = 0;
-//     public:
-//         virtual ~orderBook() = default;
-//         virtual std::vector<int32_t> addLimitOrder(orderReceived received) = 0;
-//         virtual std::vector<int32_t> recModOrders(amendOrder modOrder) = 0;
-//         virtual void recCancelOrders(amendOrder modOrder) = 0; 
-//         // show the contect of the book
-//         virtual void showBook() = 0;
-//         virtual void showLookUpMap() = 0;
-// };
 
 class dequeOrderBook : public orderBook<dequeOrderBook>{
     private:
+        friend class orderBook<dequeOrderBook>;
         std::vector<int32_t> pushOrder (std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side);
         std::vector<int32_t> matchOrder(std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
         std::vector<int32_t> matchAtPriceLevel(std::deque<std::shared_ptr<order>> &level, std::shared_ptr<order> &cleanRec);
-        void updateNextWorstPxIdxImpl(const Side side);
         std::unordered_map<std::int32_t, OrderLocation> lookUpMap;
         std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> bidBook;
         std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> askBook;
@@ -211,6 +208,7 @@ class dequeOrderBook : public orderBook<dequeOrderBook>{
         dequeOrderBook();
         // method for adding a limit order into the order book and match it if necessary
         std::vector<int32_t> addLimitOrderImpl(orderReceived received);
+        void updateNextWorstPxIdxImpl(const Side side);
         std::vector<int32_t> modifyOrderImpl(amendOrder modOrder);
         void cancelOrderImpl(amendOrder modOrder);
         // show the contect of the book

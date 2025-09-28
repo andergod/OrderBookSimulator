@@ -144,13 +144,14 @@ std::vector<int32_t> dequeOrderBook::pushOrder(std::shared_ptr<order> cleanRec, 
 }
 
 void dequeOrderBook::updateNextWorstPxIdxImpl(const Side side) {
-    std::int32_t &bestPxIdx = (side == Side::Sell) ? bestBidIdx : bestAskIdx;
-    auto& book = (side==Side::Sell) ? bidBook : askBook;
-    std::int32_t px = bestPxIdx;
-    while (px >= 0 && px < MAXTICKS && book[px].empty()) {
-        px += (side==Side::Sell ? -1 : 1);
-    }
-    bestPxIdx = px;
+    // std::int32_t &bestPxIdx = (side == Side::Sell) ? bestBidIdx : bestAskIdx;
+    // auto& book = (side==Side::Sell) ? bidBook : askBook;
+    // std::int32_t px = bestPxIdx;
+    // while (px >= 0 && px < MAXTICKS && book[px].empty()) {
+    //     px += (side==Side::Sell ? -1 : 1);
+    // }
+    // bestPxIdx = px;
+    updateNextWorstPxIdDef(side);
 }
 
 std::vector<int32_t> dequeOrderBook::matchAtPriceLevel(std::deque<std::shared_ptr<order>> &level, std::shared_ptr<order> &cleanRec) {

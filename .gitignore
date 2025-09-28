@@ -6,5 +6,5 @@
 log.txt
 build_output.txt
 .env
-data/alpaca_sample.json
+data/alpaca_sample.jsonl
 data/websocket.log

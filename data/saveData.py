@@ -2,7 +2,6 @@ import asyncio
 import websockets
 import json
 import logging
-import datetime
 from dotenv import load_dotenv
 import os
 from time import sleep

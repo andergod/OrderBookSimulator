@@ -8,7 +8,7 @@ set(CMAKE_CXX_EXTENSIONS        OFF)
 
 option(ENABLE_WARNINGS "Enable compiler warnings for a target" ON)
 
-option(ENABLE_SANITIZE_ADDR "Enable address sanitizer" OFF)
+option(ENABLE_SANITIZE_ADDR "Enable address sanitizer" ON)
 option(ENABLE_SANITIZE_UNDEF "Enable undefined sanitizer" OFF)
 
 set(LIBRARY_NAME Library)
@@ -16,6 +16,9 @@ set(EXECUTABLE_NAME Executable)
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/")
 include(Docs)
+include(AddGitSubmodule)
+
+add_git_submodule(external/json)
    
 if(ENABLE_WARNINGS)
     include(Warnings)
@@ -29,6 +32,7 @@ endif()
 add_subdirectory(configured)
 add_subdirectory(src)
 add_subdirectory(app)
+add_subdirectory(external)
 
 if(ENABLE_TESTING)
     include(CTest)
