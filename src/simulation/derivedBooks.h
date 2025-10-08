@@ -23,6 +23,7 @@ private:
     std::vector<int32_t> matchOrder(std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
     std::vector<int32_t> matchAtPriceLevel(std::deque<std::shared_ptr<order>> &level, std::shared_ptr<order> &cleanRec);
     std::unordered_map<std::int32_t, OrderLocation> lookUpMap;
+    void iterativePrint(std::deque<std::shared_ptr<order>> &ordersAtPrice);
     std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> bidBook;
     std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> askBook;
     std::int32_t bestBidIdx = -1;
@@ -53,6 +54,7 @@ private:
     OrderPool orderPool;
     std::vector<int32_t> pushOrder(OrderIntrusive *cleanRec, std::int32_t priceIdx, Side side);
     std::vector<int32_t> matchOrder(OrderIntrusive *cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
+    void iterativePrint(OrderList &ordersAtPrice);
     void updateNextWorstPxIdxImpl(const Side side);
     std::vector<int32_t> matchAtPriceLevel(OrderList &level, OrderIntrusive *cleanRec);
     std::unordered_map<std::int32_t, OrderLocationIntrusive> lookUpMap;

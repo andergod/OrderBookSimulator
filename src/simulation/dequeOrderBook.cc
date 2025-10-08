@@ -167,53 +167,26 @@ void dequeOrderBook::showBookImpl()
 {
     // iterate over each price of the order book
     using BookLevel = std::array<std::deque<std::shared_ptr<order>>, MAXTICKS>;
-    // Because i am making a array of references, I can't put them in a container
-    // So, when references aren't enough, I use pointers which difficult the verbosity but are more flexibles
     std::array<BookLevel *, 2> orderBook = {&askBook, &bidBook};
-    std::array<std::string_view, 2> bookName = {"Ask Book: ", "Bid Book"};
-    for (std::int32_t j = 0; j < orderBook.size(); ++j)
-    {
-        std::cout << bookName[j] << std::endl;
-        BookLevel &book = *orderBook[j];
-        for (std::int32_t i = 0; i < book.size(); ++i)
-        {
-            double price = (i * TICKSIZE) + MINPRICE;
-            const std::deque<std::shared_ptr<order>> &ordersAtPrice = book[i]; // The vector of orders at this price
-            if (ordersAtPrice.empty())
-            {
-                continue;
-            }
-            // Print the price level
-            std::cout << "Price: " << price << std::endl;
-            // iterate over each side (buy and sell) in a determined price
-            for (std::int32_t k = 0; k < std::min<std::size_t>(2, ordersAtPrice.size()); ++k)
-            {
-                const auto &o = ordersAtPrice[k];
-                std::time_t orderTime = std::chrono::system_clock::to_time_t(o->timestamp);
-                std::tm tm_order = *std::localtime(&orderTime);
+    def_showBookImpl(orderBook);
+}
 
-                // show the relevant values
-                std::cout << "  Order ID: " << o->order_id
-                          << ", Quantity: " << o->quantity
-                          << ", timestamp: " << std::put_time(&tm_order, "%Y-%m-%d %H:%M:%S") << std::endl;
-            }
-        }
+void dequeOrderBook::iterativePrint(std::deque<std::shared_ptr<order>> &ordersAtPrice)
+{
+    for (std::int32_t k = 0; k < std::min<std::size_t>(2, ordersAtPrice.size()); ++k)
+    {
+        const auto &o = ordersAtPrice[k];
+        std::time_t orderTime = std::chrono::system_clock::to_time_t(o->timestamp);
+        std::tm tm_order = *std::localtime(&orderTime);
+
+        // show the relevant values
+        std::cout << "  Order ID: " << o->order_id
+                  << ", Quantity: " << o->quantity
+                  << ", timestamp: " << std::put_time(&tm_order, "%Y-%m-%d %H:%M:%S") << std::endl;
     }
-    std::cout << "Best Ask: " << (bestAskIdx * TICKSIZE) + MINPRICE << std::endl;
-    std::cout << "Best Bid: " << (bestBidIdx * TICKSIZE) + MINPRICE << std::endl;
 }
 
 void dequeOrderBook::showLookUpMapImpl()
 {
-    int count = 0;
-    for (const auto &entry : lookUpMap)
-    {
-        std::cout << "Order ID: " << entry.first << std::endl;
-        std::cout << "Side: (Is Sell?) " << static_cast<bool>(entry.second.side) << std::endl;
-        std::cout << "Price Index: " << (entry.second.price_index * TICKSIZE) + MINPRICE << std::endl;
-        std::cout << "--------------------------" << std::endl;
-
-        if (++count >= 10)
-            break; // stop after 10 entries
-    }
+    def_showLookUpMapImpl();
 }

@@ -103,4 +103,43 @@ protected:
         desiredBook[priceIdx].push_back(cleanRec);
         return {};
     }
+    template <typename BookList>
+    void def_showBookImpl(BookList orderBook)
+    {
+        std::array<std::string_view, 2> bookName = {"Ask Book: ", "Bid Book: "};
+        for (std::int32_t j = 0; j < orderBook.size(); ++j)
+        {
+            std::cout << bookName[j] << std::endl;
+            auto &book = *orderBook[j];
+            for (std::int32_t i = 0; i < book.size(); ++i)
+            {
+                double price = (i * TICKSIZE) + MINPRICE;
+                auto &ordersAtPrice = book[i]; // The vector of orders at this price
+                if (ordersAtPrice.empty())
+                {
+                    continue;
+                }
+                // Print the price level
+                std::cout << "Price: " << price << std::endl;
+                // iterate over each side (buy and sell) in a determined price
+                static_cast<Derived *>(this)->iterativePrint(ordersAtPrice);
+            }
+        }
+        std::cout << "Best Ask: " << (static_cast<Derived *>(this)->bestAskIdx * TICKSIZE) + MINPRICE << std::endl;
+        std::cout << "Best Bid: " << (static_cast<Derived *>(this)->bestBidIdx * TICKSIZE) + MINPRICE << std::endl;
+    }
+    void def_showLookUpMapImpl()
+    {
+        int count = 0;
+        for (const auto &entry : static_cast<Derived *>(this)->lookUpMap)
+        {
+            std::cout << "Order ID: " << entry.first << std::endl;
+            std::cout << "Side: (Is Sell?) " << static_cast<bool>(entry.second.side) << std::endl;
+            std::cout << "Price Index: " << (entry.second.price_index * TICKSIZE) + MINPRICE << std::endl;
+            std::cout << "--------------------------" << std::endl;
+
+            if (++count >= 10)
+                break; // stop after 10 entries
+        }
+    }
 };
