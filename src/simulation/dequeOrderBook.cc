@@ -129,17 +129,7 @@ std::vector<int32_t> dequeOrderBook::matchOrder(std::shared_ptr<order> cleanRec,
 std::vector<int32_t> dequeOrderBook::pushOrder(std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side)
 {
     std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> &desiredBook = (side == Side::Sell) ? askBook : bidBook;
-    std::int32_t &bestPxIdx = (side == Side::Sell) ? bestAskIdx : bestBidIdx;
-    // updating bestAsk/bestBid in case new order is better and not matching
-    if (side == Side::Sell)
-    {
-        bestPxIdx = (priceIdx < bestPxIdx) ? priceIdx : bestPxIdx;
-    }
-    else
-    {
-        bestPxIdx = (priceIdx > bestPxIdx) ? priceIdx : bestPxIdx;
-    }
-    desiredBook[priceIdx].push_back(cleanRec);
+    def_pushOrder(desiredBook, cleanRec, priceIdx, side);
     lookUpMap.emplace(cleanRec->order_id, OrderLocation(side, priceIdx, cleanRec));
     return {};
 }

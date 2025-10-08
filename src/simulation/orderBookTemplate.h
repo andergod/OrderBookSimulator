@@ -87,4 +87,20 @@ protected:
             }
         }
     }
+    template <typename book, typename cleanRecType>
+    std::vector<int32_t> def_pushOrder(book &desiredBook, cleanRecType cleanRec, std::int32_t priceIdx, Side side)
+    {
+        std::int32_t &bestPxIdx = (side == Side::Sell) ? static_cast<Derived *>(this)->bestAskIdx : static_cast<Derived *>(this)->bestBidIdx;
+        // updating bestAsk/bestBid in case new order is better and not matching
+        if (side == Side::Sell)
+        {
+            bestPxIdx = (priceIdx < bestPxIdx) ? priceIdx : bestPxIdx;
+        }
+        else
+        {
+            bestPxIdx = (priceIdx > bestPxIdx) ? priceIdx : bestPxIdx;
+        }
+        desiredBook[priceIdx].push_back(cleanRec);
+        return {};
+    }
 };
