@@ -180,7 +180,7 @@ public:
         static_cast<Derived*>(this)->showLookUpMapImpl();
     }
 protected:
-     void updateNextWorstPxIdDef(const Side side) {
+     void def_updateNextWorstPxId(const Side side) {
         std::int32_t &bestPxIdx = (side == Side::Sell) ?  static_cast<Derived*>(this)->bestBidIdx : static_cast<Derived*>(this)->bestAskIdx;
         auto& book = (side==Side::Sell) ? static_cast<Derived*>(this)->bidBook : static_cast<Derived*>(this)->askBook;
         std::int32_t px = bestPxIdx;
