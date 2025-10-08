@@ -1,8 +1,8 @@
 #pragma once
 
 #include <chrono>
-#include <string> 
-#include <map> 
+#include <string>
+#include <map>
 #include <vector>
 #include <array>
 #include <deque>
@@ -10,10 +10,10 @@
 #include "config.hpp"
 #include <memory_resource>
 #include <optional>
-#include <memory>  
+#include <memory>
 
-
-enum class Side:bool {
+enum class Side : bool
+{
     Buy = false,
     Sell = true
 };
@@ -23,11 +23,11 @@ struct orderReceived
 {
     double price;
     std::int32_t quantity;
-    Side side;  // 0 means buy, and 1 sell
+    Side side; // 0 means buy, and 1 sell
     std::chrono::system_clock::time_point timestamp;
     std::int32_t order_id;
-    orderReceived(double p, std::int32_t q, Side s, std::chrono::system_clock::time_point  t, std::int32_t oId)
-    : price(p), quantity(q), side(s), timestamp(t), order_id(oId) {}
+    orderReceived(double p, std::int32_t q, Side s, std::chrono::system_clock::time_point t, std::int32_t oId)
+        : price(p), quantity(q), side(s), timestamp(t), order_id(oId) {}
 };
 
 // Making a mimic as what info do we actually stores for our L2 book
@@ -37,7 +37,7 @@ struct order
     std::int32_t quantity;
     std::chrono::system_clock::time_point timestamp;
     order(const std::int32_t id, const std::int32_t q, const std::chrono::system_clock::time_point t)
-    : order_id(id), quantity(q), timestamp(t) {}
+        : order_id(id), quantity(q), timestamp(t) {}
 };
 // Not using yet
 struct trade
@@ -48,36 +48,39 @@ struct trade
     std::chrono::system_clock::time_point timestamp;
     // is this always gonna be const? i am not making any change while defining
     trade(const std::string id, const double p, const int q, const std::chrono::system_clock::time_point t)
-    : trade_id(id), price(p), quantity(q), timestamp(t) {}
+        : trade_id(id), price(p), quantity(q), timestamp(t) {}
 };
 
-struct OrderLocation {
-    Side side;                   
-    std::int32_t price_index;      
+struct OrderLocation
+{
+    Side side;
+    std::int32_t price_index;
     std::shared_ptr<order> order_pt; // smart pointer
     OrderLocation() = default;
     OrderLocation(const Side s, std::int32_t pxIdx, std::shared_ptr<order> it)
-    : side(s), price_index(pxIdx), order_pt(it) {}
+        : side(s), price_index(pxIdx), order_pt(it) {}
 };
 
-struct OrderIntrusive {
+struct OrderIntrusive
+{
     std::int32_t order_id;
     std::int32_t quantity;
     std::chrono::system_clock::time_point timestamp;
-    OrderIntrusive* next;
-    OrderIntrusive* prev;
+    OrderIntrusive *next;
+    OrderIntrusive *prev;
     OrderIntrusive() = default;
     OrderIntrusive(const std::int32_t id, const std::int32_t q, const std::chrono::system_clock::time_point t)
-    : order_id(id), quantity(q), timestamp(t), next(nullptr), prev(nullptr) {}
+        : order_id(id), quantity(q), timestamp(t), next(nullptr), prev(nullptr) {}
 };
 
-struct OrderLocationIntrusive {
-    Side side;                   
-    std::int32_t price_index;      
-    OrderIntrusive* order_pt; // smart pointer
+struct OrderLocationIntrusive
+{
+    Side side;
+    std::int32_t price_index;
+    OrderIntrusive *order_pt; // smart pointer
     OrderLocationIntrusive() = default;
-    OrderLocationIntrusive(const Side s, std::int32_t pxIdx, OrderIntrusive* it)
-    : side(s), price_index(pxIdx), order_pt(it) {}
+    OrderLocationIntrusive(const Side s, std::int32_t pxIdx, OrderIntrusive *it)
+        : side(s), price_index(pxIdx), order_pt(it) {}
 };
 
 struct tradeRecord
@@ -88,45 +91,59 @@ struct tradeRecord
     trade tradeDone;
 };
 
-enum class action:bool {
+enum class action : bool
+{
     modify = true,
     cancel = false
 };
 
-struct amendOrder {
+struct amendOrder
+{
     std::int32_t order_id;
     action act;
     std::optional<double> price;
     amendOrder(std::int32_t id, action a, std::optional<double> p = std::nullopt)
-    : order_id(id), act(a), price(p) {}
+        : order_id(id), act(a), price(p) {}
 };
 
-struct OrderList {
-    OrderIntrusive* head;
-    OrderIntrusive* tail;
+struct OrderList
+{
+    OrderIntrusive *head;
+    OrderIntrusive *tail;
 
     OrderList() : head(nullptr), tail(nullptr) {}
 
-    void push_back(OrderIntrusive* order) {
+    void push_back(OrderIntrusive *order)
+    {
         order->next = nullptr;
         order->prev = tail;
-        if (tail) {
+        if (tail)
+        {
             tail->next = order;
-        } else {
+        }
+        else
+        {
             head = order;
         }
         tail = order;
     }
 
-    void erase(OrderIntrusive* order) {
-        if (order->prev) {
+    void erase(OrderIntrusive *order)
+    {
+        if (order->prev)
+        {
             order->prev->next = order->next;
-        } else {
+        }
+        else
+        {
             head = order->next;
         }
-        if (order->next) {
+        if (order->next)
+        {
             order->next->prev = order->prev;
-        } else {
+        }
+        else
+        {
             tail = order->prev;
         }
         order->next = nullptr;
@@ -136,163 +153,46 @@ struct OrderList {
     bool empty() const { return head == nullptr; }
 };
 
-class OrderPool { 
-    private:
-        std::vector<OrderIntrusive> pool;
-        std::vector<OrderIntrusive*> freeList;
-    public:
-        OrderPool(std::int32_t size);
-        OrderIntrusive* allocate(std::int32_t id, std::int32_t quantity, std::chrono::system_clock::time_point timestamp);
-        void deallocate(OrderIntrusive* order);
+class OrderPool
+{
+private:
+    std::vector<OrderIntrusive> pool;
+    std::vector<OrderIntrusive *> freeList;
+
+public:
+    OrderPool(std::int32_t size);
+    OrderIntrusive *allocate(std::int32_t id, std::int32_t quantity, std::chrono::system_clock::time_point timestamp);
+    void deallocate(OrderIntrusive *order);
 };
 
-class pmrPool {
-    std::pmr::unsynchronized_pool_resource& pool;
-    std::pmr::vector<OrderIntrusive*> free_list;
+class pmrPool
+{
+    std::pmr::unsynchronized_pool_resource &pool;
+    std::pmr::vector<OrderIntrusive *> free_list;
     size_t capacity;
 
 public:
-    pmrPool(size_t cap, std::pmr::unsynchronized_pool_resource& p);
-    OrderIntrusive* allocate(std::int32_t id, std::int32_t quantity, std::chrono::system_clock::time_point timestamp);
-    void deallocate(OrderIntrusive* order);
-        
+    pmrPool(size_t cap, std::pmr::unsynchronized_pool_resource &p);
+    OrderIntrusive *allocate(std::int32_t id, std::int32_t quantity, std::chrono::system_clock::time_point timestamp);
+    void deallocate(OrderIntrusive *order);
 };
 
-template<typename Derived>
-class orderBook {
+class orderGenerator
+{
+private:
+    // keep count of the Ids for each order generated
+    std::int32_t idGenerated;
+    std::vector<std::int32_t> activeIds;
+    // Use for random selection of Ids for cancel and ammends
+    std::unordered_map<std::int32_t, std::size_t> idToIdx;
+
 public:
-    void updateNextWorstPxIdx(const Side side) {
-        static_cast<Derived*>(this)->updateNextWorstPxIdxImpl(side);
-    }
-    std::vector<int32_t> addLimitOrder(orderReceived received) {
-        return static_cast<Derived*>(this)->addLimitOrderImpl(received);
-    }
-    std::vector<int32_t> recModOrders(amendOrder modOrder) {
-        return static_cast<Derived*>(this)->modifyOrderImpl(modOrder);
-    }
-    void recCancelOrders(amendOrder modOrder) {
-        static_cast<Derived*>(this)->cancelOrderImpl(modOrder);
-    }
-    void showBook() {
-        static_cast<Derived*>(this)->showBookImpl();
-    }
-    void showLookUpMap() {
-        static_cast<Derived*>(this)->showLookUpMapImpl();
-    }
-protected:
-     void def_updateNextWorstPxId(const Side side) {
-        std::int32_t &bestPxIdx = (side == Side::Sell) ?  static_cast<Derived*>(this)->bestBidIdx : static_cast<Derived*>(this)->bestAskIdx;
-        auto& book = (side==Side::Sell) ? static_cast<Derived*>(this)->bidBook : static_cast<Derived*>(this)->askBook;
-        std::int32_t px = bestPxIdx;
-        while (px >= 0 && px < MAXTICKS && book[px].empty()) {
-            px += (side==Side::Sell ? -1 : 1);
-        }
-        bestPxIdx = px;
-    }
-};
-
-class dequeOrderBook : public orderBook<dequeOrderBook>{
-    private:
-        friend class orderBook<dequeOrderBook>;
-        std::vector<int32_t> pushOrder (std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side);
-        std::vector<int32_t> matchOrder(std::shared_ptr<order> cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
-        std::vector<int32_t> matchAtPriceLevel(std::deque<std::shared_ptr<order>> &level, std::shared_ptr<order> &cleanRec);
-        std::unordered_map<std::int32_t, OrderLocation> lookUpMap;
-        std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> bidBook;
-        std::array<std::deque<std::shared_ptr<order>>, MAXTICKS> askBook;
-        std::int32_t bestBidIdx = -1;
-        std::int32_t bestAskIdx = MAXTICKS;
-        void CheckLookUpMap (std::unordered_map<std::int32_t, OrderLocation> &lookUpMap);
-    public:
-        //orderBook definition    
-        dequeOrderBook();
-        // method for adding a limit order into the order book and match it if necessary
-        std::vector<int32_t> addLimitOrderImpl(orderReceived received);
-        void updateNextWorstPxIdxImpl(const Side side);
-        std::vector<int32_t> modifyOrderImpl(amendOrder modOrder);
-        void cancelOrderImpl(amendOrder modOrder);
-        // show the contect of the book
-        void showBookImpl();
-        void showLookUpMapImpl();
-        // vector that holds the trades
-        std::vector<tradeRecord> trades;
-}; 
-
-class intrusiveOrderBook : public orderBook<intrusiveOrderBook>{
-    private:
-        // worth making it friends or should i manage and do everything need it public, make UpdateNextImpl public
-        // and should I make on the interphace prive but the implementation private
-        friend class orderBook<intrusiveOrderBook>;
-        OrderPool orderPool;
-        std::vector<int32_t> pushOrder (OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side);
-        std::vector<int32_t> matchOrder(OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
-        void updateNextWorstPxIdxImpl(const Side side);
-        std::vector<int32_t> matchAtPriceLevel(OrderList &level, OrderIntrusive* cleanRec);
-        std::unordered_map<std::int32_t, OrderLocationIntrusive> lookUpMap;
-        std::array<OrderList, MAXTICKS> bidBook;
-        std::array<OrderList, MAXTICKS> askBook;
-        std::int32_t bestBidIdx = -1;
-        std::int32_t bestAskIdx = MAXTICKS;
-        void CheckLookUpMap (std::unordered_map<std::int32_t, OrderLocationIntrusive> &lookUpMap);
-    public:
-        //orderBook definition    
-        intrusiveOrderBook() : orderPool(1000*MAXTICKS) {};
-        // method for adding a limit order into the order book and match it if necessary
-        std::vector<int32_t> addLimitOrderImpl(orderReceived received);
-        std::vector<int32_t> modifyOrderImpl(amendOrder modOrder);
-        void cancelOrderImpl(amendOrder modOrder);
-        // show the contect of the book
-        void showBookImpl();
-        void showLookUpMapImpl();
-        // vector that holds the trades
-        std::vector<tradeRecord> trades;
-}; 
-
-class pmrBook : public orderBook<pmrBook>{
-    private:
-        // worth making it friends or should i manage and do everything need it public, make UpdateNextImpl public
-        // and should I make on the interphace prive but the implementation private
-        friend class orderBook<pmrBook>;
-        std::vector<int32_t> pushOrder (OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side);
-        std::vector<int32_t> matchOrder(OrderIntrusive* cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx);
-        void updateNextWorstPxIdxImpl(const Side side);
-        std::vector<int32_t> matchAtPriceLevel(OrderList &level, OrderIntrusive* cleanRec);
-        std::unordered_map<std::int32_t, OrderLocationIntrusive> lookUpMap;
-        pmrPool makeOrderPool(size_t capacity);
-        std::array<OrderList, MAXTICKS> bidBook;
-        std::array<OrderList, MAXTICKS> askBook;
-        std::int32_t bestBidIdx = -1;
-        std::int32_t bestAskIdx = MAXTICKS;
-        pmrPool orderPool;
-        void CheckLookUpMap (std::unordered_map<std::int32_t, OrderLocationIntrusive> &lookUpMap);
-    public:
-        //orderBook definition    
-        pmrBook();
-        // method for adding a limit order into the order book and match it if necessary
-        std::vector<int32_t> addLimitOrderImpl(orderReceived received);
-        std::vector<int32_t> modifyOrderImpl(amendOrder modOrder);
-        void cancelOrderImpl(amendOrder modOrder);
-        // show the contect of the book
-        void showBookImpl();
-        void showLookUpMapImpl();
-        // vector that holds the trades
-        std::vector<tradeRecord> trades;
-}; 
-
-class orderGenerator{
-    private:
-        // keep count of the Ids for each order generated
-        std::int32_t idGenerated;
-        std::vector<std::int32_t> activeIds;
-        // Use for random selection of Ids for cancel and ammends
-        std::unordered_map<std::int32_t, std::size_t> idToIdx;
-    public:
-        // class definition
-        orderGenerator();
-        amendOrder cancelOrders();
-        amendOrder modifyOrders();
-        void ackCancel(std::int32_t orderId);
-        void showActiveId();
-        // method to generate random orders
-        orderReceived generateOrder();
+    // class definition
+    orderGenerator();
+    amendOrder cancelOrders();
+    amendOrder modifyOrders();
+    void ackCancel(std::int32_t orderId);
+    void showActiveId();
+    // method to generate random orders
+    orderReceived generateOrder();
 };
