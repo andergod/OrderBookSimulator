@@ -29,4 +29,4 @@ enum class type : int
     pmr
 };
 
-static constexpr type BOOKTYPE = type::deque;
+static constexpr type BOOKTYPE = type::intrusive;

@@ -19,19 +19,7 @@
 std::vector<int32_t> intrusiveOrderBook::addLimitOrderImpl(orderReceived received)
 {
     OrderIntrusive *cleanRecPt = orderPool.allocate(received.order_id, received.quantity, std::chrono::system_clock::now());
-    std::int32_t priceIdx = priceToIdx(received.price);
-    std::int32_t bestPxIdx = (received.side == Side::Sell) ? bestBidIdx : bestAskIdx;
-    // If sell then make it priceIdx <= bestPxIdex
-    bool condition = (received.side == Side::Sell) ? (priceIdx <= bestPxIdx) : (priceIdx >= bestPxIdx);
-    if (DEBUGMODE)
-    {
-        printf("Adding limit order for Id %d \n", cleanRecPt->order_id);
-        printf("Index Location: %d; ", priceIdx);
-        printf("Side: %s; ", received.side == Side::Sell ? "Sell" : "Buy");
-        printf("Quantity: %d \n", cleanRecPt->quantity);
-        fflush(stdout);
-    }
-    return (condition) ? matchOrder(cleanRecPt, priceIdx, received.side, bestPxIdx) : pushOrder(cleanRecPt, priceIdx, received.side);
+    return def_addLimitOrder(received, cleanRecPt);
 }
 
 std::vector<int32_t> intrusiveOrderBook::matchOrder(OrderIntrusive *cleanRec, std::int32_t priceIdx, Side side, std::int32_t &bestPxIdx)
@@ -121,17 +109,7 @@ std::vector<int32_t> intrusiveOrderBook::modifyOrderImpl(amendOrder modOrder)
 
 void intrusiveOrderBook::CheckLookUpMap(std::unordered_map<std::int32_t, OrderLocationIntrusive> &lookUpMap)
 {
-    for (auto &pair : lookUpMap)
-    {
-        int32_t key = pair.first;
-        OrderLocationIntrusive &loc = pair.second;
-        if (key != loc.order_pt->order_id)
-        {
-            printf("Error during checking the lookUpMap is legit for order %d \n", key);
-            fflush(stdout);
-            printf("Stop");
-        }
-    }
+    def_CheckLookUpMap(lookUpMap);
 }
 
 void intrusiveOrderBook::cancelOrderImpl(amendOrder canOrder)
@@ -187,17 +165,7 @@ void intrusiveOrderBook::updateNextWorstPxIdxImpl(const Side side)
 std::vector<int32_t> intrusiveOrderBook::pushOrder(OrderIntrusive *cleanRec, std::int32_t priceIdx, Side side)
 {
     std::array<OrderList, MAXTICKS> &desiredBook = (side == Side::Sell) ? askBook : bidBook;
-    std::int32_t &bestPxIdx = (side == Side::Sell) ? bestAskIdx : bestBidIdx;
-    // updating bestAsk/bestBid in case new order is better and not matching
-    if (side == Side::Sell)
-    {
-        bestPxIdx = (priceIdx < bestPxIdx) ? priceIdx : bestPxIdx;
-    }
-    else
-    {
-        bestPxIdx = (priceIdx > bestPxIdx) ? priceIdx : bestPxIdx;
-    }
-    desiredBook[priceIdx].push_back(cleanRec);
+    def_pushOrder(desiredBook, cleanRec, priceIdx, side);
     lookUpMap.emplace(cleanRec->order_id, OrderLocationIntrusive(side, priceIdx, cleanRec));
     return {};
 }
