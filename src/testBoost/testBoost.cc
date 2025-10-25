@@ -1,126 +1,72 @@
-//
-// Copyright (c) 2016-2019 Vinnie Falco (vinnie dot falco at gmail dot com)
-//
-// Distributed under the Boost Software License, Version 1.0. (See accompanying
-// file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
-//
-// Official repository: https://github.com/boostorg/beast
-//
-
-//------------------------------------------------------------------------------
-//
-// Example: WebSocket SSL client, synchronous
-//
-//------------------------------------------------------------------------------
-
-// Note: Vinnie Falco does not recommend this header file in production.
-#include "root_certificates.hpp"
-
 #include <boost/asio/connect.hpp>
-#include <boost/asio/ip/tcp.hpp>
-#include <boost/asio/ssl.hpp>
+#include <boost/asio/ssl/error.hpp>
+#include <boost/asio/ssl/stream.hpp>
 #include <boost/beast/core.hpp>
+#include <boost/beast/ssl.hpp>
 #include <boost/beast/websocket.hpp>
-#include <boost/beast/websocket/ssl.hpp>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <string>
 
-namespace beast     = boost::beast;         // from <boost/beast.hpp>
-namespace http      = beast::http;          // from <boost/beast/http.hpp>
-namespace websocket = beast::websocket;     // from <boost/beast/websocket.hpp>
-namespace net       = boost::asio;          // from <boost/asio.hpp>
-namespace ssl       = boost::asio::ssl;     // from <boost/asio/ssl.hpp>
-using tcp           = boost::asio::ip::tcp; // from <boost/asio/ip/tcp.hpp>
+namespace beast     = boost::beast;
+namespace http      = beast::http;
+namespace websocket = beast::websocket;
+namespace net       = boost::asio;
+namespace ssl       = net::ssl;
+using tcp           = net::ip::tcp;
+using json          = nlohmann::json;
 
-// Sends a WebSocket message and prints the response
-int main(int argc, char** argv)
+void load_root_certificates(ssl::context& ctx)
 {
+  ctx.set_default_verify_paths();
+}
+
+int main()
+{
+  const std::string host   = "stream.data.alpaca.markets";
+  const std::string port   = "443";
+  const std::string target = "/v1beta3/crypto/us";
+
+  const std::string api_key    = std::getenv("API_KEY");
+  const std::string api_secret = std::getenv("API_SECRET");
+
   try {
-    // Check command line arguments.
-    if (argc != 4) {
-      std::cerr << "Usage: websocket-client-sync-ssl <host> <port> <text>\n"
-                << "Example:\n"
-                << "    websocket-client-sync-ssl echo.websocket.org 443 "
-                   "\"Hello, world!\"\n";
-      return EXIT_FAILURE;
-    }
-    std::string host = argv[1];
-    auto const  port = argv[2];
-    auto const  text = argv[3];
-
-    // The io_context is required for all I/O
     net::io_context ioc;
+    ssl::context    ctx{ssl::context::tlsv12_client};
+    load_root_certificates(ctx);
 
-    // The SSL context is required, and holds certificates
-    ssl::context ctx{ssl::context::tlsv12_client};
+    tcp::resolver                                     resolver{ioc};
+    websocket::stream<beast::ssl_stream<tcp::socket>> ws{ioc, ctx};
 
-    // Verify the remote server's certificate
-    ctx.set_verify_mode(ssl::verify_peer);
-
-    // This holds the root certificate used for verification
-    load_root_certificates(
-      ctx); // Note: This function is not recommended for production use.
-
-    // These objects perform our I/O
-    tcp::resolver                               resolver{ioc};
-    websocket::stream<ssl::stream<tcp::socket>> ws{ioc, ctx};
-
-    // Look up the domain name
+    // 🔹 Resolve domain
     auto const results = resolver.resolve(host, port);
 
-    // Make the connection on the IP address we get from a lookup
-    auto ep = net::connect(beast::get_lowest_layer(ws), results);
+    // 🔹 Connect TCP
+    net::connect(ws.next_layer().next_layer(), results.begin(), results.end());
 
-    // Set SNI Hostname (many hosts need this to handshake successfully)
-    if (!SSL_set_tlsext_host_name(
-          ws.next_layer().native_handle(), host.c_str())) {
-      throw beast::system_error(
-        static_cast<int>(::ERR_get_error()), net::error::get_ssl_category());
-    }
-
-    // Set the expected hostname in the peer certificate for verification
-    ws.next_layer().set_verify_callback(ssl::host_name_verification(host));
-
-    // Update the host_ string. This will provide the value of the
-    // Host HTTP header during the WebSocket handshake.
-    // See https://tools.ietf.org/html/rfc7230#section-5.4
-    host += ':' + std::to_string(ep.port());
-
-    // Perform the SSL handshake
+    // 🔹 Perform SSL handshake
     ws.next_layer().handshake(ssl::stream_base::client);
 
-    // Set a decorator to change the User-Agent of the handshake
-    ws.set_option(
-      websocket::stream_base::decorator([](websocket::request_type& req) {
-        req.set(
-          http::field::user_agent,
-          std::string(BOOST_BEAST_VERSION_STRING) + " websocket-client-coro");
-      }));
+    // 🔹 Perform WebSocket handshake
+    ws.handshake(host, target);
 
-    // Perform the websocket handshake
-    ws.handshake(host, "/");
+    // 🔹 Send authentication JSON
+    json auth = {{"action", "auth"}, {"key", api_key}, {"secret", api_secret}};
 
-    // Send the message
-    ws.write(net::buffer(std::string(text)));
+    ws.write(net::buffer(auth.dump()));
 
-    // This buffer will hold the incoming message
+    // 🔹 Read server response
     beast::flat_buffer buffer;
-
-    // Read a message into our buffer
     ws.read(buffer);
+    std::cout << "Auth response: " << beast::make_printable(buffer.data())
+              << std::endl;
 
-    // Close the WebSocket connection
+    // 🔹 Close cleanly
     ws.close(websocket::close_code::normal);
-
-    // If we get here then the connection is closed gracefully
-
-    // The make_printable() function helps print a ConstBufferSequence
-    std::cout << beast::make_printable(buffer.data()) << std::endl;
   }
   catch (std::exception const& e) {
     std::cerr << "Error: " << e.what() << std::endl;
-    return EXIT_FAILURE;
   }
-  return EXIT_SUCCESS;
 }
