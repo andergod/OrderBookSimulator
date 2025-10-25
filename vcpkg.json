@@ -3,6 +3,7 @@
   "name": "boost-beast-example",
   "version": "0.15.2",
   "dependencies": [
+    "boost",
     "boost-beast"
   ]
 }
