@@ -12,7 +12,8 @@ set(CMAKE_CXX_STANDARD          17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS        ON)
 
-find_package(boost_beast CONFIG REQUIRED)
+find_package(OpenSSL CONFIG REQUIRED)
+find_package(boost_beast REQUIRED)
 
 # Define _WIN32_WINNT based on the Windows SDK version being used, from
 # https://stackoverflow.com/a/40217291
@@ -45,7 +46,7 @@ endif()
 
 option(ENABLE_WARNINGS "Enable compiler warnings for a target" ON)
 
-option(ENABLE_SANITIZE_ADDR "Enable address sanitizer" ON)
+option(ENABLE_SANITIZE_ADDR "Enable address sanitizer" OFF)
 option(ENABLE_SANITIZE_UNDEF "Enable undefined sanitizer" OFF)
 
 set(LIBRARY_NAME Library)

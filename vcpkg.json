@@ -4,6 +4,7 @@
   "version": "0.15.2",
   "dependencies": [
     "boost",
-    "boost-beast"
+    "boost-beast",
+    "openssl"
   ]
 }
