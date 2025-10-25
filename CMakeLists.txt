@@ -1,16 +1,16 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(OrderBook VERSION 1.0.0 LANGUAGES C CXX)
-
-set(CMAKE_CXX_STANDARD          17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS        ON)
-
 set(VCPKG_HOME "$ENV{VCPKG_ROOT}")
 string(REPLACE "\\" "/" VCPKG_HOME "${VCPKG_HOME}")
 set(CMAKE_TOOLCHAIN_FILE
     "${VCPKG_HOME}/scripts/buildsystems/vcpkg.cmake"
     CACHE STRING "")
+
+project(OrderBook VERSION 1.0.0 LANGUAGES C CXX)
+
+set(CMAKE_CXX_STANDARD          17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS        ON)
 
 find_package(boost_beast CONFIG REQUIRED)
 

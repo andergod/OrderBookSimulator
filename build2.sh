@@ -9,7 +9,7 @@ print_help() {
 Usage: $(basename "$0") [BUILD_TYPE] [NUM_THREADS] [-G GENERATOR] [-A ARCHITECTURE]
 
 Options:
-  BUILD_TYPE     Optional. Specify the build type: Debug or Release (default).
+  BUILD_TYPE     Optional. Specify the build type: Debug (default) or Release.
   NUM_THREADS    Optional. Number of parallel build threads. Defaults to (nproc - 1).
   -G GENERATOR   Optional. CMake generator (e.g., Ninja, Unix Makefiles, Visual Studio 17 2022).
   -A ARCHITECTURE Optional. Architecture for Visual Studio generators (e.g., Win32, x64, ARM64).
@@ -18,7 +18,7 @@ Flags:
   -h, --help     Show this help message and exit.
 
 Examples:
-  $(basename "$0")                            # Release build, auto threads
+  $(basename "$0")                            # Debug build, auto threads
   $(basename "$0") Release                    # Release build, auto threads
   $(basename "$0") Debug 8                    # Debug build, 8 threads
   $(basename "$0") Release 4 -G Ninja         # Release build, 4 threads, Ninja generator
@@ -34,7 +34,7 @@ error_exit() {
 }
 
 # Parse arguments
-BUILD_TYPE="Release"
+BUILD_TYPE="Debug"
 NUM_PROC=""
 GENERATOR=""
 ARCHITECTURE=""
@@ -84,11 +84,6 @@ pushd "$BUILD_DIR" || error_exit "Failed to change to build directory"
 
 echo ""
 echo "This is a $BUILD_TYPE build."
-
-if [ "$BUILD_TYPE" != "Release" ]; then
-  echo "The build type must be Release, aborting."
-  exit 1
-fi
 
 echo "Building with $NUM_PROC threads."
 [[ -n "$GENERATOR" ]] && echo "Using generator: $GENERATOR"
