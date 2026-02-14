@@ -87,7 +87,7 @@ int main()
     ws.write(net::buffer(sub_msg.dump()));
 
     // Open output file
-    std::ofstream out("src/testBoost/alpaca_data.jsonl", std::ios::out);
+    std::ofstream out("src/barGeneration/alpaca_data.jsonl", std::ios::out);
     if (!out.is_open())
       throw std::runtime_error("Failed to open output file");
     buffer.consume(buffer.size());
@@ -110,7 +110,7 @@ int main()
     // you'll have two messages together
 
     auto       start   = std::chrono::steady_clock::now();
-    const auto runtime = std::chrono::seconds(60);
+    const auto runtime = std::chrono::seconds(5);
 
     orderBook ob;
 
@@ -125,14 +125,20 @@ int main()
       try {
         json parsed = json::parse(msg);
         out << parsed.dump() << "\n";
-        auto resp = parsed[0];
-        if (resp["T"] == "o") {
-          message m = resp.get<message>();
-          for (auto u : m.askBook) {
-            ob.addUpdate(u.price, Side::a, u.quantity, log_file);
+        for (int i=0; i<parsed.size(); ++i) {
+          auto resp = parsed[i];
+          if (resp["T"] == "o") {
+            message m = resp.get<message>();
+            for (auto u : m.askBook) {
+              ob.addUpdateBook(u.price, Side::a, u.quantity, log_file);
+            }
+            for (auto u : m.bidBook) {
+              ob.addUpdateBook(u.price, Side::b, u.quantity, log_file);
+            }
           }
-          for (auto u : m.bidBook) {
-            ob.addUpdate(u.price, Side::b, u.quantity, log_file);
+          if (resp["T"]=="t") {
+            trade t = resp.get<trade>();
+            ob.addUpdateTrades(t.price, t.side, t.size, t.time, log_file);
           }
         }
       }
@@ -147,6 +153,7 @@ int main()
     std::cout << "Data collection complete, saved to alpaca_data.jsonl\n";
     log_file << "Data collection complete, saved to alpaca_data.jsonl\n";
     ob.showBook(log_file);
+    ob.showTrades(log_file);
     log_file.close();
   }
   catch (std::exception const& e) {
