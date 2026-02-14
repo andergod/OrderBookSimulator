@@ -1,3 +1,4 @@
+#include "orderBookTrack.hpp"
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ssl/error.hpp>
 #include <boost/asio/ssl/stream.hpp>
@@ -29,8 +30,13 @@ int main()
   const std::string port   = "443";
   const std::string target = "/v1beta3/crypto/us";
 
-  const std::string api_key    = std::getenv("API_KEY");
-  const std::string api_secret = std::getenv("API_SECRET");
+  const char* raw_key = std::getenv("API_KEY");
+  const char* raw_secret = std::getenv("API_SECRET");
+
+  if (!raw_key || !raw_secret) throw std::runtime_error("API_KEY or API_SECRET not set");
+
+  const std::string api_key = raw_key;  // safe copy
+  const std::string api_secret = raw_secret;
 
   try {
     net::io_context ioc;
@@ -40,33 +46,111 @@ int main()
     tcp::resolver                                     resolver{ioc};
     websocket::stream<beast::ssl_stream<tcp::socket>> ws{ioc, ctx};
 
-    // 🔹 Resolve domain
+    // Resolve host
     auto const results = resolver.resolve(host, port);
 
-    // 🔹 Connect TCP
-    net::connect(ws.next_layer().next_layer(), results.begin(), results.end());
+    // Connect TCP
+    auto ep = net::connect(beast::get_lowest_layer(ws), results);
 
-    // 🔹 Perform SSL handshake
+    std::ofstream log_file("log.txt", std::ios::out);
+    if (!log_file.is_open())
+      throw std::runtime_error("Failed to open log file");
+
+    // Set SNI using only hostname (no port!)
+    if (!SSL_set_tlsext_host_name(
+          ws.next_layer().native_handle(), host.c_str())) {
+      throw beast::system_error(
+        static_cast<int>(::ERR_get_error()), net::error::get_ssl_category());
+    }
+
+    // SSL handshake
     ws.next_layer().handshake(ssl::stream_base::client);
 
-    // 🔹 Perform WebSocket handshake
     ws.handshake(host, target);
 
-    // 🔹 Send authentication JSON
+    // Send authentication JSON
     json auth = {{"action", "auth"}, {"key", api_key}, {"secret", api_secret}};
 
     ws.write(net::buffer(auth.dump()));
 
-    // 🔹 Read server response
+    // Read server response
     beast::flat_buffer buffer;
     ws.read(buffer);
     std::cout << "Auth response: " << beast::make_printable(buffer.data())
               << std::endl;
+    log_file << "Auth response: " << beast::make_printable(buffer.data())
+             << std::endl;
 
-    // 🔹 Close cleanly
+    // --- Subscribe to BTC/USD orderbook and trades ---
+    json sub_msg = {{"action", "subscribe"}, {"orderbooks", {"BTC/USD"}}};
+
+    ws.write(net::buffer(sub_msg.dump()));
+
+    // Open output file
+    std::ofstream out("src/testBoost/alpaca_data.jsonl", std::ios::out);
+    if (!out.is_open())
+      throw std::runtime_error("Failed to open output file");
+    buffer.consume(buffer.size());
+    ws.read(buffer);
+    std::cout << "Sub response: " << beast::make_printable(buffer.data())
+              << std::endl;
+    log_file << "Sub response: " << beast::make_printable(buffer.data())
+             << std::endl;
+    buffer.consume(buffer.size());
+    ws.read(buffer);
+    std::cout << "Subscriptions: " << beast::make_printable(buffer.data())
+              << std::endl;
+    log_file << "Subscriptions: " << beast::make_printable(buffer.data())
+             << std::endl;
+    // The correct syntax when handeling buffer is
+    // ws.read(buffer) ads the latest message into the buffer
+    // beast::make_printable(buffer.data()) throws the info in bits somewhere
+    // buffer.consume(buffer.size()) cleans the buffer so the next read is only
+    // one line if you don't do this, the next we.read(buffer) will append and
+    // you'll have two messages together
+
+    auto       start   = std::chrono::steady_clock::now();
+    const auto runtime = std::chrono::seconds(60);
+
+    orderBook ob;
+
+    // Read messages for 5 seconds
+    while (std::chrono::steady_clock::now() - start < runtime) {
+      buffer.consume(buffer.size()); // clear previous data
+      ws.read(buffer);
+
+      // Convert buffer to string
+      std::string msg = beast::buffers_to_string(buffer.data());
+
+      try {
+        json parsed = json::parse(msg);
+        out << parsed.dump() << "\n";
+        auto resp = parsed[0];
+        if (resp["T"] == "o") {
+          message m = resp.get<message>();
+          for (auto u : m.askBook) {
+            ob.addUpdate(u.price, Side::a, u.quantity, log_file);
+          }
+          for (auto u : m.bidBook) {
+            ob.addUpdate(u.price, Side::b, u.quantity, log_file);
+          }
+        }
+      }
+      catch (json::parse_error& e) {
+        std::cerr << "Invalid JSON received: " << msg << std::endl;
+      }
+    }
+
+    // Close WebSocket
     ws.close(websocket::close_code::normal);
+    out.close();
+    std::cout << "Data collection complete, saved to alpaca_data.jsonl\n";
+    log_file << "Data collection complete, saved to alpaca_data.jsonl\n";
+    ob.showBook(log_file);
+    log_file.close();
   }
   catch (std::exception const& e) {
     std::cerr << "Error: " << e.what() << std::endl;
   }
+  return 0;
 }

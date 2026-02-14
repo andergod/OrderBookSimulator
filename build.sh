@@ -6,20 +6,23 @@ readonly OUTPUT_FILE="$DIR/build_output.txt"
 
 print_help() {
   cat <<EOF
-Usage: $(basename "$0") [BUILD_TYPE] [NUM_THREADS]
+Usage: $(basename "$0") [BUILD_TYPE] [NUM_THREADS] [-G GENERATOR] [-A ARCHITECTURE]
 
 Options:
   BUILD_TYPE     Optional. Specify the build type: Debug (default) or Release.
-  NUM_THREADS    Optional. Specify the number of parallel build threads.
-                 If not provided, the script will auto-detect and use (nproc - 1).
+  NUM_THREADS    Optional. Number of parallel build threads. Defaults to (nproc - 1).
+  -G GENERATOR   Optional. CMake generator (e.g., Ninja, Unix Makefiles, Visual Studio 17 2022).
+  -A ARCHITECTURE Optional. Architecture for Visual Studio generators (e.g., Win32, x64, ARM64).
 
 Flags:
-  -h, --help      Show this help message and exit.
+  -h, --help     Show this help message and exit.
 
 Examples:
-  $(basename "$0")                 # Debug build with auto thread detection
-  $(basename "$0") Release         # Release build with auto thread detection
-  $(basename "$0") Debug 8         # Debug build with 8 threads
+  $(basename "$0")                            # Debug build, auto threads
+  $(basename "$0") Release                    # Release build, auto threads
+  $(basename "$0") Debug 8                    # Debug build, 8 threads
+  $(basename "$0") Release 4 -G Ninja         # Release build, 4 threads, Ninja generator
+  $(basename "$0") Debug -G "Visual Studio 17 2022" -A x64  # Debug build, Visual Studio, x64
 EOF
   exit 0
 }
@@ -30,27 +33,45 @@ error_exit() {
   exit 1
 }
 
-# Handle --help or -h
-if [[ "$1" == "--help" || "$1" == "-h" ]]; then
-  print_help
+# --- Load environment variables from .env if it exists ---
+ENV_FILE=".env"
+if [ -f "$ENV_FILE" ]; then
+  echo "Loading environment variables from $ENV_FILE"
+  # Export all non-comment, non-empty lines
+  export $(grep -v '^#' "$ENV_FILE" | xargs)
+else
+  echo "No .env file found at $ENV_FILE, skipping environment load."
 fi
+# for now, should delete this later
+# Parse arguments
+BUILD_TYPE="Debug"
+NUM_PROC=""
+GENERATOR=""
+ARCHITECTURE=""
 
-# Default to "Debug" if no arguments are provided
-BUILD_TYPE="${1:-Debug}"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --help|-h) print_help ;;
+    -G) shift; GENERATOR="$1" ;;
+    -A) shift; ARCHITECTURE="$1" ;;
+    Debug|Release) BUILD_TYPE="$1" ;;
+    [0-9]*) NUM_PROC="$1" ;;
+    *) error_exit "Invalid argument: $1. Use --help for usage." ;;
+  esac
+  shift
+done
 
+# Validate build type
 if [[ "$BUILD_TYPE" != "Debug" && "$BUILD_TYPE" != "Release" ]]; then
-  error_exit "Invalid argument: $1. Expected 'Debug' or 'Release'. Use --help for usage."
+  error_exit "Invalid build type: $BUILD_TYPE. Expected 'Debug' or 'Release'."
 fi
 
-# Optional second argument: number of threads
-if [[ -n "$2" ]]; then
-  if [[ "$2" =~ ^[0-9]+$ && "$2" -gt 0 ]]; then
-    NUM_PROC="$2"
-  else
-    error_exit "Invalid number of threads: $2"
+# Validate number of threads
+if [[ -n "$NUM_PROC" ]]; then
+  if [[ ! "$NUM_PROC" =~ ^[0-9]+$ || "$NUM_PROC" -le 0 ]]; then
+    error_exit "Invalid number of threads: $NUM_PROC"
   fi
 else
-  # Auto-detect threads if not specified
   NUM_PROC=$(nproc)
   if [[ -z "$NUM_PROC" || "$NUM_PROC" -le 0 ]]; then
     NUM_PROC=4
@@ -60,6 +81,7 @@ else
   fi
 fi
 
+# Clean or create build directory
 if [ -f "$OUTPUT_FILE" ]; then
   rm -f "$OUTPUT_FILE" || error_exit "Failed to delete existing output file"
 fi
@@ -72,13 +94,22 @@ pushd "$BUILD_DIR" || error_exit "Failed to change to build directory"
 
 echo ""
 echo "This is a $BUILD_TYPE build."
+
 echo "Building with $NUM_PROC threads."
+[[ -n "$GENERATOR" ]] && echo "Using generator: $GENERATOR"
+[[ -n "$ARCHITECTURE" ]] && echo "Architecture: $ARCHITECTURE"
 echo ""
 
-# Redirect both stdout and stderr to the output file
+# Build CMake command
+CMAKE_CMD="cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE"
+[[ -n "$GENERATOR" ]] && CMAKE_CMD="$CMAKE_CMD -G \"$GENERATOR\""
+[[ -n "$ARCHITECTURE" ]] && CMAKE_CMD="$CMAKE_CMD -A $ARCHITECTURE"
+CMAKE_CMD="$CMAKE_CMD .."
+
+# Execute CMake and build
 {
-  cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" .. || error_exit "CMake configuration failed"
-  cmake --build . --parallel "$NUM_PROC" || error_exit "CMake build failed"
+  eval "$CMAKE_CMD" || error_exit "CMake configuration failed"
+  cmake --build . --config "$BUILD_TYPE" --parallel "$NUM_PROC" || error_exit "CMake build failed"
 } 2>&1 | tee "$OUTPUT_FILE"
 
 popd || error_exit "Failed to return to the original directory"
