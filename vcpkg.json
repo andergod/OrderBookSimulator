@@ -5,6 +5,12 @@
   "dependencies": [
     "boost",
     "boost-beast",
-    "openssl"
+    "openssl",
+    {
+      "name": "arrow",
+      "features": [
+        "parquet"
+      ]
+    }
   ]
 }

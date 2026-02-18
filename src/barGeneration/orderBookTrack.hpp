@@ -31,6 +31,15 @@ struct trade {
   
 };
 
+struct bar {
+  double avgBid;
+  double avgAsk;
+  double avgTrade;
+  std::int32_t tradeQuantity;
+  std::int32_t bidQuantity;
+  std::int32_t askQuantity;
+};
+
 struct update {
   double quantity;
   std::int32_t price;
@@ -65,6 +74,7 @@ inline void from_json(const json& j, trade& t)
   std::string time_str;
   j.at("t").get_to(time_str);
   
+  // i should make this a function because decompressing times is gonna become a thing everywhere
   int y, m, d, h, min, s;
   if (sscanf(time_str.c_str(), "%d-%d-%dT%d:%d:%d", &y, &m, &d, &h, &min, &s) == 6) {
     std::tm tm = {};
@@ -104,7 +114,6 @@ private:
   std::vector<double> bidBook;
   std::vector<double> askBook;
   std::vector<trade>   trades;
-
   std::int32_t        priceToIdx(double price)
   {
     return static_cast<std::int32_t>((price - MINPRICE) / TICKSIZE);
@@ -113,9 +122,16 @@ private:
 public:
   // orderBook definition
   orderBook() : bidBook(MAXTICKS, 0.0), askBook(MAXTICKS, 0.0) {};
+  std::chrono::steady_clock::time_point next_bar_close;
+  std::chrono::seconds bar_interval{1};
+
+  void firstBarCameIn() {
+    auto now = std::chrono::steady_clock::now();
+    if (next_bar_close.time_since_epoch().count() == 0)
+      next_bar_close = now + bar_interval;
+  };
   void addUpdateBook(
-    std::int32_t price, Side side, double quantity, std::ostream& os = std::cout)
-  {
+    std::int32_t price, Side side, double quantity, std::ostream& os = std::cout) {
     if (price < MINPRICE || price > MAXPRICE) {
       os << "Invalid price: " << price << std::endl;
       return;
@@ -125,6 +141,44 @@ public:
       bidBook[priceIdx] = quantity;
     else
       askBook[priceIdx] = quantity;
+  };
+  void createBar(std::ostream& os = std::cout) {
+    // Missing implementation for the trade size, only publishing Bid-ask spred
+    double avgBid = 0.0;
+    double avgAsk = 0.0;
+    double avgTrade = 0.0;
+    std::int32_t tradeQty = 0;
+    std::int32_t bidQty = 0;
+    std::int32_t askQty = 0;
+    std::int32_t bidCount = 0;
+    std::int32_t askCount = 0;
+    std::int32_t tradeCount = 0;
+
+    for (int i = 0; i < MAXTICKS; i++) {
+      if (bidBook[i] == 0)
+        continue;
+      double bidPrice = static_cast<double>( MINPRICE + i * TICKSIZE);
+      avgBid +=bidPrice;
+      bidCount += bidBook[i];
+      bidCount++;
+    }
+    avgBid = (bidCount > 0) ? (avgBid / bidCount) : 0.0;
+      
+    for (int i = 0; i < MAXTICKS; i++){
+      if (askBook[i] == 0) 
+        continue;
+      double askPrice = static_cast<double>(MINPRICE + (i + 1) * TICKSIZE);
+      avgAsk += askPrice;
+      askQty += askBook[i];
+      askCount++;
+    }
+
+    avgAsk = (askCount > 0) ? (avgAsk / askCount) : 0.0;
+
+    auto now = std::chrono::steady_clock::now();
+    auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                      now.time_since_epoch()).count();
+    os << "At time:" << ns << ", Bid:" << avgBid << ", Ask:" << avgAsk << std::endl;      
   };
   void addUpdateTrades(
     double price, std::string side, double size, time_point<system_clock, duration<uint64_t, std::nano>> time, std::ostream& os = std::cout

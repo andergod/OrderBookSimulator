@@ -15,6 +15,10 @@ set(CMAKE_CXX_EXTENSIONS        ON)
 find_package(OpenSSL CONFIG REQUIRED)
 find_package(boost_beast REQUIRED)
 
+# Find Arrow[Parquet]
+find_package(Arrow CONFIG REQUIRED)
+find_package(Parquet CONFIG REQUIRED)
+
 # Define _WIN32_WINNT based on the Windows SDK version being used, from
 # https://stackoverflow.com/a/40217291
 if(WIN32)

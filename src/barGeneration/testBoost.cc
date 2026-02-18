@@ -5,12 +5,19 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/ssl.hpp>
 #include <boost/beast/websocket.hpp>
+#include <arrow/api.h>
+#include <arrow/io/api.h>
+#include <parquet/arrow/reader.h>
+#include <parquet/arrow/writer.h>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <ctime>
+#include <cstdio>
 
+using namespace std::chrono;
 namespace beast     = boost::beast;
 namespace http      = beast::http;
 namespace websocket = beast::websocket;
@@ -55,6 +62,10 @@ int main()
     std::ofstream log_file("log.txt", std::ios::out);
     if (!log_file.is_open())
       throw std::runtime_error("Failed to open log file");
+
+    std::ofstream bars_file("bars.txt", std::ios::out);
+    if (!bars_file.is_open())
+      throw std::runtime_error("Failed to open bars file");
 
     // Set SNI using only hostname (no port!)
     if (!SSL_set_tlsext_host_name(
@@ -110,9 +121,10 @@ int main()
     // you'll have two messages together
 
     auto       start   = std::chrono::steady_clock::now();
-    const auto runtime = std::chrono::seconds(5);
+    const auto runtime = std::chrono::seconds(30);
 
     orderBook ob;
+    ob.firstBarCameIn();
 
     // Read messages for 5 seconds
     while (std::chrono::steady_clock::now() - start < runtime) {
@@ -121,6 +133,8 @@ int main()
 
       // Convert buffer to string
       std::string msg = beast::buffers_to_string(buffer.data());
+      // this should be a timestamp from the current bar
+      auto now = std::chrono::steady_clock::now();
 
       try {
         json parsed = json::parse(msg);
@@ -145,6 +159,12 @@ int main()
       catch (json::parse_error& e) {
         std::cerr << "Invalid JSON received: " << msg << std::endl;
       }
+      if ((now > ob.next_bar_close) ||
+          (now == ob.next_bar_close)) {
+        ob.createBar(bars_file);
+        // ob.reset_state(); missing implementation for trades specially
+        ob.next_bar_close += ob.bar_interval;
+      }
     }
 
     // Close WebSocket
@@ -155,6 +175,7 @@ int main()
     ob.showBook(log_file);
     ob.showTrades(log_file);
     log_file.close();
+    bars_file.close();
   }
   catch (std::exception const& e) {
     std::cerr << "Error: " << e.what() << std::endl;
