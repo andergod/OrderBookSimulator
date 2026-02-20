@@ -1,10 +1,6 @@
 #include "orderBookTrack.hpp"
-#include <boost/asio/connect.hpp>
-#include <boost/asio/ssl/error.hpp>
-#include <boost/asio/ssl/stream.hpp>
-#include <boost/beast/core.hpp>
-#include <boost/beast/ssl.hpp>
-#include <boost/beast/websocket.hpp>
+#include "networking.hpp"
+
 #include <arrow/api.h>
 #include <arrow/io/api.h>
 #include <parquet/arrow/reader.h>
@@ -26,13 +22,10 @@ namespace ssl       = net::ssl;
 using tcp           = net::ip::tcp;
 using json          = nlohmann::json;
 
-void load_root_certificates(ssl::context& ctx)
-{
-  ctx.set_default_verify_paths();
-}
-
 int main()
 {
+
+  
   const std::string host   = "stream.data.alpaca.markets";
   const std::string port   = "443";
   const std::string target = "/v1beta3/crypto/us";
@@ -40,10 +33,10 @@ int main()
   const char* raw_key = std::getenv("API_KEY");
   const char* raw_secret = std::getenv("API_SECRET");
 
-  if (!raw_key || !raw_secret) throw std::runtime_error("API_KEY or API_SECRET not set");
-
   const std::string api_key = raw_key;  // safe copy
   const std::string api_secret = raw_secret;
+
+  if (!raw_key || !raw_secret) throw std::runtime_error("API_KEY or API_SECRET not set");
 
   try {
     net::io_context ioc;
@@ -121,7 +114,7 @@ int main()
     // you'll have two messages together
 
     auto       start   = std::chrono::steady_clock::now();
-    const auto runtime = std::chrono::seconds(30);
+    const auto runtime = std::chrono::seconds(5);
 
     orderBook ob;
     ob.firstBarCameIn();
