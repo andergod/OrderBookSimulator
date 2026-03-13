@@ -1,4 +1,4 @@
-add_executable(testBoost testBoost.cc orderBookTrack.hpp networking.hpp)
+add_executable(testBoost testBoost.cc orderBookTrack.hpp networking.hpp configBars.h)
 target_link_libraries(testBoost PRIVATE Boost::beast OpenSSL::SSL nlohmann_json::nlohmann_json
                                         OpenSSL::Crypto)
 

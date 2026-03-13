@@ -1,3 +1,4 @@
+#include "configBars.h"
 #include "networking.hpp"
 #include "orderBookTrack.hpp"
 
@@ -24,19 +25,6 @@ using json          = nlohmann::json;
 
 int main()
 {
-  const std::string host   = "stream.data.alpaca.markets";
-  const std::string port   = "443";
-  const std::string target = "/v1beta3/crypto/us";
-
-  const char* raw_key    = std::getenv("API_KEY");
-  const char* raw_secret = std::getenv("API_SECRET");
-
-  const std::string api_key    = raw_key; // safe copy
-  const std::string api_secret = raw_secret;
-
-  if (!raw_key || !raw_secret)
-    throw std::runtime_error("API_KEY or API_SECRET not set");
-
   try {
     std::ofstream log_file("log.txt", std::ios::out);
     if (!log_file.is_open())
@@ -46,18 +34,13 @@ int main()
     if (!bars_file.is_open())
       throw std::runtime_error("Failed to open bars file");
 
-    // Set SNI using only hostname (no port!)
-    // We're not using this anymore not sure why
-    // if (!SSL_set_tlsext_host_name(
-    //       ws.next_layer().native_handle(), host.c_str())) {
-    //   throw beast::system_error(
-    //     static_cast<int>(::ERR_get_error()), net::error::get_ssl_category());
-    // }
-
-    WebsocketClient client(host, port, target);
+    WebsocketClient client(config::HOST, config::PORT, config::TARGET);
     client.connect();
     // Send authentication JSON
-    json auth = {{"action", "auth"}, {"key", api_key}, {"secret", api_secret}};
+    json auth = {
+      {"action", "auth"},
+      {"key", config::get_api_key()},
+      {"secret", config::get_api_secret()}};
 
     client.send(auth);
 
@@ -83,7 +66,7 @@ int main()
     log_file << "Subscriptions: " << response << std::endl;
 
     auto       start   = std::chrono::steady_clock::now();
-    const auto runtime = std::chrono::seconds(5);
+    const auto runtime = std::chrono::seconds(30);
 
     orderBook ob;
     ob.firstBarCameIn();
@@ -103,10 +86,12 @@ int main()
           if (resp["T"] == "o") {
             message m = resp.get<message>();
             for (auto u : m.askBook) {
-              ob.addUpdateBook(u.price, Side::a, u.quantity, log_file);
+              ob.receiveQuoteUpdate(
+                u.price, Side::a, u.quantity, m.time, log_file);
             }
             for (auto u : m.bidBook) {
-              ob.addUpdateBook(u.price, Side::b, u.quantity, log_file);
+              ob.receiveQuoteUpdate(
+                u.price, Side::b, u.quantity, m.time, log_file);
             }
           }
           if (resp["T"] == "t") {

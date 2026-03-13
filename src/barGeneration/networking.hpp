@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <string_view>
 namespace beast     = boost::beast;
 namespace http      = beast::http;
 namespace websocket = beast::websocket;
@@ -22,7 +23,10 @@ using json          = nlohmann::json;
 
 class WebsocketClient {
 public:
-  WebsocketClient(std::string host, std::string port, std::string target);
+  WebsocketClient(
+    std::string_view host,
+    std::string_view port,
+    std::string_view target);
   void        connect();
   void        send(const json& j);
   std::string readMessage();
@@ -41,12 +45,12 @@ private:
 };
 
 WebsocketClient::WebsocketClient(
-  std::string host,
-  std::string port,
-  std::string target)
-  : host(std::move(host))
-  , port(std::move(port))
-  , target(std::move(target))
+  std::string_view host_,
+  std::string_view port_,
+  std::string_view target_)
+  : host(host_)
+  , port(port_)
+  , target(target_)
   , ctx(ssl::context::tlsv12_client)
   , resolver(ioc)
   , ws(ioc, ctx)
