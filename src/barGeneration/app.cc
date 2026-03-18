@@ -94,11 +94,11 @@ void process_message(
 
 int main()
 {
-  std::ofstream log_file("log.txt", std::ios::out);
+  std::ofstream log_file("src/barGeneration/log.txt", std::ios::out);
   if (!log_file.is_open())
     throw std::runtime_error("Failed to open log file");
 
-  std::ofstream bars_file("bars.txt", std::ios::out);
+  std::ofstream bars_file("src/barGeneration/bars.txt", std::ios::out);
   if (!bars_file.is_open())
     throw std::runtime_error("Failed to open bars file");
 
