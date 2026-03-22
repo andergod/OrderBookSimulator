@@ -51,7 +51,6 @@ struct trade {
   double                                price;
   int                                   quantity;
   std::chrono::system_clock::time_point timestamp;
-  // is this always gonna be const? i am not making any change while defining
   trade(
     const std::string                           id,
     const double                                p,

@@ -17,13 +17,7 @@
 #include <string>
 
 using namespace std::chrono;
-namespace beast     = boost::beast;
-namespace http      = beast::http;
-namespace websocket = beast::websocket;
-namespace net       = boost::asio;
-namespace ssl       = net::ssl;
-using tcp           = net::ip::tcp;
-using json          = nlohmann::json;
+using json = nlohmann::json;
 
 void alpaca_connect(WebsocketClient& client, std::ostream& log_file)
 {

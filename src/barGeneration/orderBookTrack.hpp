@@ -71,8 +71,7 @@ public:
       latestToB.price_ask    = 0.0;
       latestToB.ask_quantity = 0.0;
     }
-    latestToB.last_update_time = latestToB.time;
-    latestToB.time             = time;
+    latestToB.time = time;
   };
   void barUpdate()
   {

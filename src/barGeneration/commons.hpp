@@ -79,7 +79,6 @@ struct topOfBook {
   double                                                  bid_quantity;
   double                                                  ask_quantity;
   time_point<system_clock, duration<uint64_t, std::nano>> time;
-  time_point<system_clock, duration<uint64_t, std::nano>> last_update_time;
 };
 
 struct bar {

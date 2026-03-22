@@ -48,8 +48,6 @@ public:
 class intrusiveOrderBook : public orderBook<intrusiveOrderBook>
 {
 private:
-    // worth making it friends or should i manage and do everything need it public, make UpdateNextImpl public
-    // and should I make on the interphace prive but the implementation private
     friend class orderBook<intrusiveOrderBook>;
     OrderPool orderPool;
     std::vector<int32_t> pushOrder(OrderIntrusive *cleanRec, std::int32_t priceIdx, Side side);
